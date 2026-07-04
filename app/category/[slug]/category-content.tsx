@@ -1,0 +1,539 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { createClient } from '@/lib/supabase/client';
+import { Category, Product, ProductVariant } from '@/types/database';
+import { MainLayout } from '@/components/layout/main-layout';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Star, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+
+interface CategoryPageContentProps {
+  category: Category;
+  initialFilters: {
+    sort?: string;
+    color?: string;
+    size?: string;
+    min?: string;
+    max?: string;
+    page?: string;
+  };
+}
+
+// Demo products for when database is empty
+const demoProducts: (Product & { variants: ProductVariant[] })[] = [
+  {
+    id: '1',
+    name: 'Royal Banarasi Silk Saree',
+    slug: 'royal-banarasi-silk-saree',
+    description: 'Handwoven Banarasi silk saree with intricate gold zari work.',
+    base_price: 25999,
+    category_id: '1',
+    is_active: true,
+    avg_rating: 4.8,
+    review_count: 124,
+    created_at: new Date().toISOString(),
+    variants: [{
+      id: '1',
+      product_id: '1',
+      sku: 'RBS-001',
+      color: 'Maroon',
+      size: 'Free Size',
+      stock_quantity: 10,
+      image_urls: ['https://images.pexels.com/photos/1078983/pexels-photo-1078983.jpeg'],
+      is_active: true,
+      created_at: new Date().toISOString(),
+      price_override: null,
+    }],
+  },
+  {
+    id: '2',
+    name: 'Contemporary Block Print Saree',
+    slug: 'contemporary-block-print-saree',
+    description: 'Modern design with traditional block print.',
+    base_price: 8999,
+    category_id: '1',
+    is_active: true,
+    avg_rating: 4.6,
+    review_count: 89,
+    created_at: new Date().toISOString(),
+    variants: [{
+      id: '2',
+      product_id: '2',
+      sku: 'CPS001',
+      color: 'Navy Blue',
+      size: 'Free Size',
+      stock_quantity: 15,
+      image_urls: ['https://images.pexels.com/photos/1647920/pexels-photo-1647920.jpeg'],
+      is_active: true,
+      created_at: new Date().toISOString(),
+      price_override: null,
+    }],
+  },
+  {
+    id: '3',
+    name: 'Chanderi Cotton Saree',
+    slug: 'chanderi-cotton-saree',
+    description: 'Lightweight Chanderi cotton saree with subtle embroidery.',
+    base_price: 7499,
+    category_id: '1',
+    is_active: true,
+    avg_rating: 4.5,
+    review_count: 67,
+    created_at: new Date().toISOString(),
+    variants: [{
+      id: '3',
+      product_id: '3',
+      sku: 'CCS001',
+      color: 'Peach',
+      size: 'Free Size',
+      stock_quantity: 8,
+      image_urls: ['https://images.pexels.com/photos/322207/pexels-photo-322207.jpeg'],
+      is_active: true,
+      created_at: new Date().toISOString(),
+      price_override: null,
+    }],
+  },
+  {
+    id: '4',
+    name: 'Pure Kanjeevaram Saree',
+    slug: 'pure-kanjeevaram-saree',
+    description: 'Traditional Kanjeevaram silk with temple borders.',
+    base_price: 35999,
+    category_id: '1',
+    is_active: true,
+    avg_rating: 4.9,
+    review_count: 156,
+    created_at: new Date().toISOString(),
+    variants: [{
+      id: '4',
+      product_id: '4',
+      sku: 'PKS001',
+      color: 'Royal Blue',
+      size: 'Free Size',
+      stock_quantity: 5,
+      image_urls: ['https://images.pexels.com/photos/769770/pexels-photo-769770.jpeg'],
+      is_active: true,
+      created_at: new Date().toISOString(),
+      price_override: null,
+    }],
+  },
+];
+
+const colors = ['Maroon', 'Navy Blue', 'Peach', 'Royal Blue', 'Gold', 'Green', 'Black', 'Pink'];
+const sizes = ['Free Size', 'S', 'M', 'L', 'XL'];
+const priceRanges = [
+  { label: 'Under ₹5,000', min: 0, max: 5000 },
+  { label: '₹5,000 - ₹10,000', min: 5000, max: 10000 },
+  { label: '₹10,000 - ₹20,000', min: 10000, max: 20000 },
+  { label: '₹20,000 - ₹30,000', min: 20000, max: 30000 },
+  { label: 'Above ₹30,000', min: 30000, max: 999999 },
+];
+
+export function CategoryPageContent({ category, initialFilters }: CategoryPageContentProps) {
+  const [products, setProducts] = useState<(Product & { variants: ProductVariant[] })[]>(demoProducts);
+  const [loading, setLoading] = useState(true);
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [priceRange, setPriceRange] = useState<{ min: number; max: number } | null>(null);
+  const [sortBy, setSortBy] = useState(initialFilters.sort || 'newest');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    async function fetchProducts() {
+      const supabase = createClient();
+
+      // First get category ID from slug
+      const { data: categoryData } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('slug', category.slug)
+        .maybeSingle();
+
+      if (categoryData) {
+        const { data, error } = await supabase
+          .from('products')
+          .select(`
+            *,
+            variants:product_variants (*)
+          `)
+          .eq('category_id', categoryData.id)
+          .eq('is_active', true);
+
+        if (data && data.length > 0) {
+          setProducts(data as (Product & { variants: ProductVariant[] })[]);
+        }
+      }
+      setLoading(false);
+    }
+
+    fetchProducts();
+  }, [category.slug]);
+
+  const updateFilters = () => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (sortBy) params.set('sort', sortBy);
+    if (selectedColors.length) params.set('color', selectedColors.join(','));
+    if (selectedSizes.length) params.set('size', selectedSizes.join(','));
+    if (priceRange) {
+      params.set('min', priceRange.min.toString());
+      params.set('max', priceRange.max.toString());
+    }
+
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  const filteredProducts = products.filter(product => {
+    const variant = product.variants?.[0];
+    const price = variant?.price_override ?? product.base_price;
+
+    if (selectedColors.length > 0 && variant?.color && !selectedColors.includes(variant.color)) {
+      return false;
+    }
+
+    if (selectedSizes.length > 0 && variant?.size && !selectedSizes.includes(variant.size)) {
+      return false;
+    }
+
+    if (priceRange && (price < priceRange.min || price > priceRange.max)) {
+      return false;
+    }
+
+    return true;
+  }).sort((a, b) => {
+    const aVariant = a.variants?.[0];
+    const bVariant = b.variants?.[0];
+    const aPrice = aVariant?.price_override ?? a.base_price;
+    const bPrice = bVariant?.price_override ?? b.base_price;
+
+    switch (sortBy) {
+      case 'price-low':
+        return aPrice - bPrice;
+      case 'price-high':
+        return bPrice - aPrice;
+      case 'rating':
+        return (b.avg_rating || 0) - (a.avg_rating || 0);
+      default:
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+  });
+
+  const FilterContent = () => (
+    <div className="space-y-6">
+      <Accordion type="multiple" defaultValue={['color', 'size', 'price']}>
+        <AccordionItem value="color">
+          <AccordionTrigger className="text-sm font-medium">Color</AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-3">
+              {colors.map(color => (
+                <Label key={color} className="flex items-center gap-3 cursor-pointer">
+                  <Checkbox
+                    checked={selectedColors.includes(color)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedColors([...selectedColors, color]);
+                      } else {
+                        setSelectedColors(selectedColors.filter(c => c !== color));
+                      }
+                    }}
+                  />
+                  <span className="text-sm">{color}</span>
+                </Label>
+              ))}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="size">
+          <AccordionTrigger className="text-sm font-medium">Size</AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-3">
+              {sizes.map(size => (
+                <Label key={size} className="flex items-center gap-3 cursor-pointer">
+                  <Checkbox
+                    checked={selectedSizes.includes(size)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedSizes([...selectedSizes, size]);
+                      } else {
+                        setSelectedSizes(selectedSizes.filter(s => s !== size));
+                      }
+                    }}
+                  />
+                  <span className="text-sm">{size}</span>
+                </Label>
+              ))}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="price">
+          <AccordionTrigger className="text-sm font-medium">Price Range</AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-3">
+              {priceRanges.map(range => (
+                <Label key={range.label} className="flex items-center gap-3 cursor-pointer">
+                  <Checkbox
+                    checked={priceRange?.min === range.min && priceRange?.max === range.max}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setPriceRange({ min: range.min, max: range.max });
+                      } else {
+                        setPriceRange(null);
+                      }
+                    }}
+                  />
+                  <span className="text-sm">{range.label}</span>
+                </Label>
+              ))}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
+      <Button className="w-full" onClick={updateFilters}>
+        Apply Filters
+      </Button>
+
+      {(selectedColors.length > 0 || selectedSizes.length > 0 || priceRange) && (
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => {
+            setSelectedColors([]);
+            setSelectedSizes([]);
+            setPriceRange(null);
+            router.push(pathname);
+          }}
+        >
+          Clear All Filters
+        </Button>
+      )}
+    </div>
+  );
+
+  return (
+    <MainLayout>
+      <div className="min-h-screen">
+        {/* Category Header */}
+        <div className="bg-secondary/20 py-12">
+          <div className="container mx-auto px-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center"
+            >
+              <h1 className="font-display text-3xl md:text-4xl font-semibold mb-4">
+                {category.name}
+              </h1>
+              {category.description && (
+                <p className="text-muted-foreground max-w-2xl mx-auto">
+                  {category.description}
+                </p>
+              )}
+            </motion.div>
+          </div>
+        </div>
+
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-between mb-6">
+            <p className="text-sm text-muted-foreground">
+              {filteredProducts.length} Products
+            </p>
+
+            <div className="flex items-center gap-4">
+              {/* Desktop Filters */}
+              <div className="hidden lg:flex items-center gap-2">
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest">Newest</SelectItem>
+                    <SelectItem value="price-low">Price: Low to High</SelectItem>
+                    <SelectItem value="price-high">Price: High to Low</SelectItem>
+                    <SelectItem value="rating">Top Rated</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Mobile Filter Sheet */}
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="sm" className="lg:hidden">
+                    <SlidersHorizontal className="h-4 w-4 mr-2" />
+                    Filters
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-80">
+                  <SheetHeader>
+                    <SheetTitle className="font-display">Filters</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-6">
+                    <FilterContent />
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+          </div>
+
+          {/* Active Filters */}
+          {(selectedColors.length > 0 || selectedSizes.length > 0 || priceRange) && (
+            <div className="flex flex-wrap items-center gap-2 mb-6">
+              <span className="text-sm text-muted-foreground">Active filters:</span>
+              {selectedColors.map(color => (
+                <Badge key={color} variant="secondary" className="gap-1">
+                  {color}
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => setSelectedColors(selectedColors.filter(c => c !== color))} />
+                </Badge>
+              ))}
+              {selectedSizes.map(size => (
+                <Badge key={size} variant="secondary" className="gap-1">
+                  {size}
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => setSelectedSizes(selectedSizes.filter(s => s !== size))} />
+                </Badge>
+              ))}
+              {priceRange && (
+                <Badge variant="secondary" className="gap-1">
+                  ₹{priceRange.min.toLocaleString()} - ₹{priceRange.max.toLocaleString()}
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => setPriceRange(null)} />
+                </Badge>
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-8">
+            {/* Desktop Sidebar Filters */}
+            <div className="hidden lg:block w-64 flex-shrink-0">
+              <div className="sticky top-24">
+                <h3 className="font-display text-lg font-medium mb-4">Filters</h3>
+                <FilterContent />
+              </div>
+            </div>
+
+            {/* Products Grid */}
+            <div className="flex-1">
+              {loading ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+                  {[...Array(8)].map((_, index) => (
+                    <div key={index} className="space-y-4">
+                      <div className="aspect-[3/4] bg-muted rounded-lg image-loading" />
+                      <div className="h-4 bg-muted rounded w-1/3" />
+                      <div className="h-4 bg-muted rounded w-full" />
+                      <div className="h-4 bg-muted rounded w-1/2" />
+                    </div>
+                  ))}
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No products found matching your filters.</p>
+                  <Button
+                    variant="link"
+                    onClick={() => {
+                      setSelectedColors([]);
+                      setSelectedSizes([]);
+                      setPriceRange(null);
+                    }}
+                  >
+                    Clear all filters
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+                  {filteredProducts.map((product, index) => {
+                    const variant = product.variants?.[0];
+                    const price = variant?.price_override ?? product.base_price;
+                    const image = variant?.image_urls?.[0];
+
+                    return (
+                      <motion.div
+                        key={product.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <Link href={`/product/${product.slug}`}>
+                          <Card className="group overflow-hidden border-0 shadow-none bg-transparent">
+                            <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-muted">
+                              {image ? (
+                                <Image
+                                  src={image}
+                                  alt={product.name}
+                                  fill
+                                  sizes="(max-width: 768px) 50vw, 33vw"
+                                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                                />
+                              ) : (
+                                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-accent/10" />
+                              )}
+
+                              {product.avg_rating > 0 && (
+                                <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium">
+                                  <Star className="h-3 w-3 fill-primary text-primary" />
+                                  {product.avg_rating.toFixed(1)}
+                                </div>
+                              )}
+
+                              {variant?.stock_quantity === 0 && (
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                  <span className="text-white font-medium">Out of Stock</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="mt-4 space-y-2">
+                              <h3 className="font-medium text-sm md:text-base line-clamp-2 group-hover:text-primary transition-colors">
+                                {product.name}
+                              </h3>
+                              <div className="flex items-center gap-2">
+                                <span className="font-display text-lg font-semibold">
+                                  ₹{price?.toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
+                          </Card>
+                        </Link>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </MainLayout>
+  );
+}
