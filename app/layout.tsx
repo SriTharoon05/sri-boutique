@@ -1,17 +1,28 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter, Cormorant_Garamond } from 'next/font/google';
+import localFont from 'next/font/local';
 import { Providers } from './providers';
 
-const inter = Inter({
-  subsets: ['latin'],
+const inter = localFont({
+  src: [
+    { path: '../public/fonts/inter-v20-latin-300.woff2', weight: '300', style: 'normal' },
+    { path: '../public/fonts/inter-v20-latin-regular.woff2', weight: '400', style: 'normal' },
+    { path: '../public/fonts/inter-v20-latin-500.woff2', weight: '500', style: 'normal' },
+    { path: '../public/fonts/inter-v20-latin-600.woff2', weight: '600', style: 'normal' },
+    { path: '../public/fonts/inter-v20-latin-700.woff2', weight: '700', style: 'normal' },
+  ],
   variable: '--font-inter',
   display: 'swap',
 });
 
-const cormorant = Cormorant_Garamond({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
+const cormorant = localFont({
+  src: [
+    { path: '../public/fonts/cormorant-garamond-v21-latin-300.woff2', weight: '300', style: 'normal' },
+    { path: '../public/fonts/cormorant-garamond-v21-latin-regular.woff2', weight: '400', style: 'normal' },
+    { path: '../public/fonts/cormorant-garamond-v21-latin-500.woff2', weight: '500', style: 'normal' },
+    { path: '../public/fonts/cormorant-garamond-v21-latin-600.woff2', weight: '600', style: 'normal' },
+    { path: '../public/fonts/cormorant-garamond-v21-latin-700.woff2', weight: '700', style: 'normal' },
+  ],
   variable: '--font-cormorant',
   display: 'swap',
 });
