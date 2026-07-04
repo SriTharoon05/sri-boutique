@@ -248,7 +248,7 @@ export function HomePageContent() {
               className="flex flex-wrap justify-center gap-4"
             >
               <Button asChild size="lg" className="text-base">
-                <Link href="/category/sarees">
+                <Link href="#categories">
                   Explore Collection
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
@@ -296,7 +296,7 @@ export function HomePageContent() {
       </section>
 
       {/* Categories Section */}
-      <section className="py-16 md:py-24">
+      <section id="categories" className="py-16 md:py-24">
         <div className="container mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -371,7 +371,7 @@ export function HomePageContent() {
               </h2>
             </div>
             <Button asChild variant="outline" className="self-start md:self-auto">
-              <Link href="/category/sarees">
+              <Link href="/category/silk-sarees">
                 View All <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
