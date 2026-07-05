@@ -23,7 +23,6 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. MANDATORY signature verification — no fallback path, no silent skip.
-    //    If any of these fields are missing, reject outright.
     const key_secret = process.env.RAZORPAY_KEY_SECRET;
 
     if (!key_secret) {
@@ -47,17 +46,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Only reachable once the signature is genuinely verified.
-    //    Use the ADMIN (service-role) client here — this bypasses RLS,
-    //    which is fine because trust is established by the signature check
-    //    above, not by the caller's own row-level permissions.
     const adminSupabase = createAdminClient();
 
-    // 4a. Confirm the order actually belongs to this user AND is still pending,
-    //     before touching it — prevents replay against someone else's order
-    //     or double-processing an already-paid order.
     const { data: existingOrder, error: fetchError } = await adminSupabase
       .from('orders')
-      .select('id, user_id, status')
+      .select('id, user_id, status, email_sent')
       .eq('id', orderId)
       .single();
 
@@ -69,41 +62,67 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Order does not belong to this user' }, { status: 403 });
     }
 
-    if (existingOrder.status === 'paid') {
-      // Already processed (e.g. webhook got there first) — treat as success, don't error.
-      return NextResponse.json({ success: true, alreadyProcessed: true });
+    // 5. Mark the order paid if it isn't already. This may have already
+    //    happened via the razorpay-webhook (which often fires before this
+    //    client-side callback runs) — that's fine, this is idempotent.
+    if (existingOrder.status !== 'paid') {
+      const { error: updateError } = await adminSupabase
+        .from('orders')
+        .update({
+          status: 'paid',
+          payment_status: 'success',
+          payment_id: razorpay_payment_id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', orderId);
+
+      if (updateError) {
+        console.error('Error updating order:', updateError);
+        return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
+      }
     }
 
-    // 5. Update order status — real payment ID only, no demo fallback.
-    const { error: updateError } = await adminSupabase
+    // 6. Claim the right to send the confirmation email.
+    //    This is an ATOMIC conditional update: it only succeeds (and only
+    //    returns a row) if email_sent is still false at this exact moment.
+    //    Whichever process — this route or the razorpay-webhook — wins this
+    //    race is the one responsible for sending the email. The other one
+    //    will see 0 rows affected and skip sending, so the email fires
+    //    exactly once no matter which path reaches "paid" first.
+    const { data: claimedOrder, error: claimError } = await adminSupabase
       .from('orders')
       .update({
-        status: 'paid',
-        payment_status: 'success',
-        payment_id: razorpay_payment_id,
-        updated_at: new Date().toISOString(),
+        email_sent: true,
+        email_sent_at: new Date().toISOString(),
       })
-      .eq('id', orderId);
+      .eq('id', orderId)
+      .eq('email_sent', false)
+      .select('id')
+      .maybeSingle();
 
-    if (updateError) {
-      console.error('Error updating order:', updateError);
-      return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
+    if (claimError) {
+      console.error('Error claiming email-send right:', claimError);
+      // Don't fail the whole request over this — payment is already verified.
     }
 
-    // 6. Fetch full order details for the confirmation email
+    const wonEmailClaim = !!claimedOrder;
+
+    // 7. Fetch full order details (needed for both the response and, if we
+    //    won the claim, the email payload).
     const { data: order } = await adminSupabase
       .from('orders')
       .select(`*, items:order_items (*)`)
       .eq('id', orderId)
       .single();
 
-    // 7. Send confirmation email via Edge Function (best-effort, non-blocking on failure)
-    if (order && process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    // 8. Send confirmation email via Edge Function — only if we won the
+    //    claim above. Best-effort, non-blocking on failure.
+    if (wonEmailClaim && order && process.env.NEXT_PUBLIC_SUPABASE_URL) {
       try {
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-        await fetch(`${supabaseUrl}/functions/v1/send-order-email`, {
+        const emailRes = await fetch(`${supabaseUrl}/functions/v1/send-order-email`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -122,13 +141,28 @@ export async function POST(request: NextRequest) {
             shippingAddress: order.shipping_address,
           }),
         });
+
+        if (!emailRes.ok) {
+          const errText = await emailRes.text();
+          console.error('send-order-email returned non-OK status:', emailRes.status, errText);
+          // Release the claim so the webhook (or a retry) can still send it.
+          await adminSupabase
+            .from('orders')
+            .update({ email_sent: false, email_sent_at: null })
+            .eq('id', orderId);
+        }
       } catch (emailError) {
         console.error('Failed to send order email:', emailError);
-        // Don't fail the payment verification if email fails
+        console.error('Order items were:', JSON.stringify(order?.items));
+        // Release the claim so it can be retried by the webhook path.
+        await adminSupabase
+          .from('orders')
+          .update({ email_sent: false, email_sent_at: null })
+          .eq('id', orderId);
       }
     }
 
-    return NextResponse.json({ success: true, order });
+    return NextResponse.json({ success: true, order, alreadyProcessed: existingOrder.status === 'paid' });
   } catch (error) {
     console.error('Error verifying payment:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

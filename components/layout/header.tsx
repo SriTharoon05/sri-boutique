@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/components/providers/auth-provider';
 import { useCart } from '@/components/providers/cart-provider';
@@ -19,6 +20,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
   SheetTrigger,
 } from '@/components/ui/sheet';
 import {
@@ -95,6 +97,9 @@ export function Header() {
               <SheetContent className="w-full sm:max-w-lg">
                 <SheetHeader>
                   <SheetTitle className="font-display">Shopping Cart</SheetTitle>
+                  <SheetDescription className="sr-only">
+                    Review items in your shopping cart
+                  </SheetDescription>
                 </SheetHeader>
                 <div className="mt-8 overflow-y-auto">
                   {items.length === 0 ? (
@@ -154,9 +159,11 @@ export function Header() {
                   <Button variant="ghost" className="flex items-center gap-2">
                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                       {profile?.avatar_url ? (
-                        <img
+                        <Image
                           src={profile.avatar_url}
                           alt={profile.full_name || 'User'}
+                          width={32}
+                          height={32}
                           className="h-8 w-8 rounded-full object-cover"
                         />
                       ) : (
@@ -203,8 +210,8 @@ export function Header() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button onClick={signInWithGoogle} variant="default">
-                Sign In
+              <Button asChild variant="default">
+                <Link href="/auth/login">Sign In</Link>
               </Button>
             )}
 

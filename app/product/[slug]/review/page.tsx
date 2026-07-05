@@ -132,6 +132,7 @@ export default function WriteReviewPage() {
       }
 
       toast.success('Review submitted — thank you!');
+      router.refresh();
       router.push(`/product/${params.slug}`);
     } catch (error: any) {
       toast.error(error.message || 'Failed to submit review');

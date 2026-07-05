@@ -1,7 +1,7 @@
 'use client';
 
 export const dynamic = 'force-dynamic';
-
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -51,6 +51,12 @@ export default function CheckoutPage() {
   const [razorpayOrderId, setRazorpayOrderId] = useState<string | null>(null);
   const [discount, setDiscount] = useState(0);
 
+  // Tracks whether checkout has already succeeded, so the "cart is
+  // empty, redirect to /cart" effect below knows to stand down instead of
+  // hijacking navigation right after a successful payment (which naturally
+  // empties the cart via refreshCart()).
+  const [paymentCompleted, setPaymentCompleted] = useState(false);
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/auth/login?redirectTo=/checkout');
@@ -66,10 +72,13 @@ export default function CheckoutPage() {
   }, [user, profile, authLoading, router]);
 
   useEffect(() => {
-    if (items.length === 0 && !cartLoading) {
+    // Guard: don't redirect to /cart if we just successfully completed
+    // payment — the cart is expected to be empty at that point, and we're
+    // already navigating to the order confirmation page instead.
+    if (items.length === 0 && !cartLoading && !paymentCompleted) {
       router.push('/cart');
     }
-  }, [items, cartLoading, router]);
+  }, [items, cartLoading, router, paymentCompleted]);
 
   const shipping = subtotal > 2000 ? 0 : 99;
   const total = subtotal - discount + shipping;
@@ -124,14 +133,9 @@ export default function CheckoutPage() {
         throw new Error(orderData.error || 'Failed to create order');
       }
 
-      // Keep a LOCAL variable for immediate use in this function's closures.
-      // We still call setOrderId for the rest of the component (e.g. final
-      // redirect), but nothing below should rely on the `orderId` STATE
-      // variable until after a re-render — React state updates are async.
       const currentOrderId: string = orderData.order.id;
       setOrderId(currentOrderId);
 
-      // Create Razorpay order
       const paymentRes = await fetch('/api/payments/create-razorpay-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -149,9 +153,7 @@ export default function CheckoutPage() {
 
       setRazorpayOrderId(paymentData.id);
 
-      // Initialize Razorpay checkout
       if (paymentData.demo) {
-        // Demo mode - skip actual payment
         toast.info('Demo mode: Simulating successful payment');
         await handlePaymentSuccess(currentOrderId, `demo_payment_${Date.now()}`);
       } else {
@@ -163,7 +165,6 @@ export default function CheckoutPage() {
           description: 'Order Payment',
           order_id: paymentData.id,
           handler: async (response: any) => {
-            // Pass currentOrderId directly — do NOT read `orderId` state here.
             await verifyPayment(response, currentOrderId);
           },
           prefill: {
@@ -213,12 +214,20 @@ export default function CheckoutPage() {
   };
 
   const handlePaymentSuccess = async (currentOrderId: string, paymentId: string) => {
-    toast.success('Payment successful!');
+    // IMPORTANT: set this FIRST, synchronously, before refreshCart() or the
+    // navigation — this is what stops the empty-cart effect from racing
+    // in and redirecting to /cart instead of the order confirmation page.
+    setPaymentCompleted(true);
+
+    // NOTE: no toast here. The success moment is now shown exactly once,
+    // as a premium animated checkmark overlay, on the order confirmation
+    // page (triggered by the ?payment=success query param below). Showing
+    // it here too was one of the sources of the duplicate "Payment
+    // successful!" messages.
     refreshCart();
     router.push(`/account/orders/${currentOrderId}?payment=success`);
   };
 
-  // Load Razorpay script
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
@@ -244,9 +253,7 @@ export default function CheckoutPage() {
         <h1 className="font-display text-3xl font-semibold mb-8">Checkout</h1>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Checkout Form */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Shipping Address */}
             <Card className="p-6">
               <div className="flex items-center gap-3 mb-6">
                 <MapPin className="h-5 w-5 text-primary" />
@@ -349,7 +356,6 @@ export default function CheckoutPage() {
               </div>
             </Card>
 
-            {/* Payment Section */}
             <Card className="p-6">
               <div className="flex items-center gap-3 mb-6">
                 <CreditCard className="h-5 w-5 text-primary" />
@@ -370,7 +376,6 @@ export default function CheckoutPage() {
             </Card>
           </div>
 
-          {/* Order Summary */}
           <div className="lg:col-span-1">
             <Card className="p-6 sticky top-24">
               <h2 className="font-display text-xl font-semibold mb-6">Order Summary</h2>
@@ -382,7 +387,7 @@ export default function CheckoutPage() {
                     <div key={item.id} className="flex gap-4">
                       <div className="w-16 h-20 bg-muted rounded flex-shrink-0 relative">
                         {item.variant.image_urls?.[0] && (
-                          <img
+                          <Image
                             src={item.variant.image_urls[0]}
                             alt={item.variant.product?.name || 'Product'}
                             className="w-full h-full object-cover rounded"

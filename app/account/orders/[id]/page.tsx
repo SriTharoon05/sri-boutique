@@ -2,18 +2,18 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Package, MapPin, Phone, CreditCard, Truck, CheckCircle2, PackageOpen } from 'lucide-react';
+import { Loader2, Package, MapPin, Phone, CreditCard, Truck, CheckCircle2, PackageOpen, Check } from 'lucide-react';
 import { Order, OrderItem } from '@/types/database';
 import Link from 'next/link';
-import { toast } from 'sonner';
+import { PaymentSuccessOverlay } from '@/components/payment-success-overlay';
 
 const statusSteps = [
   { key: 'pending', label: 'Order Placed', icon: Package },
@@ -35,9 +35,16 @@ export default function OrderDetailPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const params = useParams();
+  const orderId = params?.id as string | undefined;
+
   const [order, setOrder] = useState<(Order & { items: OrderItem[] }) | null>(null);
   const [loading, setLoading] = useState(true);
-  const orderId = typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : null;
+  const [notFound, setNotFound] = useState(false);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+
+  const successShownRef = useRef(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -46,14 +53,27 @@ export default function OrderDetailPage() {
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    if (searchParams.get('payment') === 'success') {
-      toast.success('Payment successful! Your order has been placed.');
+    if (searchParams.get('payment') === 'success' && !successShownRef.current) {
+      successShownRef.current = true;
+      setShowSuccessOverlay(true);
+
+      const url = new URL(window.location.href);
+      url.searchParams.delete('payment');
+      router.replace(url.pathname + url.search, { scroll: false });
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   useEffect(() => {
     async function fetchOrder() {
       if (!user || !orderId) return;
+
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(orderId)) {
+        console.error('Invalid order id in URL:', orderId);
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
 
       try {
         const res = await fetch(`/api/orders/${orderId}`);
@@ -66,6 +86,7 @@ export default function OrderDetailPage() {
         setOrder(data.order);
       } catch (error) {
         console.error('Error fetching order:', error);
+        setNotFound(true);
       } finally {
         setLoading(false);
       }
@@ -86,7 +107,7 @@ export default function OrderDetailPage() {
     );
   }
 
-  if (!order) {
+  if (!order || notFound) {
     return (
       <MainLayout>
         <div className="container mx-auto px-4 py-12">
@@ -106,6 +127,12 @@ export default function OrderDetailPage() {
 
   return (
     <MainLayout>
+      <PaymentSuccessOverlay
+        show={showSuccessOverlay}
+        onClose={() => setShowSuccessOverlay(false)}
+        orderNumber={order.order_number}
+      />
+
       <div className="container mx-auto px-4 py-12">
         <Button asChild variant="ghost" className="mb-6">
           <Link href="/account/orders">&larr; Back to Orders</Link>
@@ -132,31 +159,51 @@ export default function OrderDetailPage() {
         {/* Order Status Timeline */}
         {order.status !== 'cancelled' && order.status !== 'refunded' && (
           <Card className="p-6 mb-8">
-            <div className="flex justify-between items-center overflow-x-auto">
+            <div className="flex items-start">
               {statusSteps.map((step, index) => {
-                const isCompleted = index <= currentStatusIndex;
-                const isCurrent = index === currentStatusIndex;
+                // A step is "reached" if the order's current status is at or
+                // past it. Every reached step — including the current/final
+                // one — shows the same solid green "done" styling. There is
+                // no separate "in progress, still brown" state anymore: once
+                // a step is reached, it's done.
+                const isReached = index <= currentStatusIndex;
+                const isLast = index === statusSteps.length - 1;
 
                 return (
-                  <div key={step.key} className="flex flex-col items-center min-w-[80px]">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      isCompleted
-                        ? isCurrent
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-green-100 text-green-600'
-                        : 'bg-muted text-muted-foreground'
-                    }`}>
-                      <step.icon className="h-5 w-5" />
+                  <div key={step.key} className="flex items-center flex-1 last:flex-none">
+                    {/* Icon + label column */}
+                    <div className="flex flex-col items-center min-w-[80px]">
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors ${
+                          isReached
+                            ? 'bg-green-500 border-green-500 text-white'
+                            : 'bg-muted border-muted text-muted-foreground'
+                        }`}
+                      >
+                        {isReached ? (
+                          <Check className="h-5 w-5" strokeWidth={3} />
+                        ) : (
+                          <step.icon className="h-5 w-5" />
+                        )}
+                      </div>
+                      <p
+                        className={`text-xs mt-2 text-center whitespace-nowrap ${
+                          isReached ? 'font-medium text-foreground' : 'text-muted-foreground'
+                        }`}
+                      >
+                        {step.label}
+                      </p>
                     </div>
-                    <p className={`text-xs mt-2 text-center ${
-                      isCompleted ? 'font-medium' : 'text-muted-foreground'
-                    }`}>
-                      {step.label}
-                    </p>
-                    {index < statusSteps.length - 1 && (
-                      <div className={`hidden md:block absolute h-0.5 w-[calc(100%-80px)] ${
-                        isCompleted && index < currentStatusIndex ? 'bg-green-300' : 'bg-muted'
-                      }`} />
+
+                    {/* Connector line to the next step — a normal flex
+                        sibling, not an absolutely positioned overlay, so it
+                        can never stretch over the icons. */}
+                    {!isLast && (
+                      <div
+                        className={`h-0.5 flex-1 mx-2 mb-6 rounded-full transition-colors ${
+                          index < currentStatusIndex ? 'bg-green-500' : 'bg-muted'
+                        }`}
+                      />
                     )}
                   </div>
                 );
