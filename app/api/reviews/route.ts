@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   // Verify the order belongs to the user and is delivered
   const { data: order } = await supabase
     .from('orders')
-    .select('id, status')
+    .select('id, status, items:order_items(variant:product_variants(product_id))')
     .eq('id', order_id)
     .eq('user_id', user.id)
     .maybeSingle();
@@ -29,6 +29,18 @@ export async function POST(request: NextRequest) {
       { error: 'You can only review products from delivered orders' },
       { status: 400 }
     );
+  }
+
+  const containsProduct = (order.items || []).some((item: any) => {
+    const variant = Array.isArray(item.variant) ? item.variant[0] : item.variant;
+    return variant?.product_id === product_id;
+  });
+  if (!containsProduct) {
+    return NextResponse.json({ error: 'This product is not part of the selected order' }, { status: 400 });
+  }
+
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5 || (comment && String(comment).length > 2000)) {
+    return NextResponse.json({ error: 'Invalid review' }, { status: 400 });
   }
 
   const { data, error } = await supabase

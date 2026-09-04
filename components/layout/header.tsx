@@ -34,6 +34,7 @@ import {
   ChevronDown,
   LayoutDashboard,
 } from 'lucide-react';
+import { SearchDialog } from './search-dialog';
 
 // NOTE: these slugs must match the `slug` column in your `categories` table exactly.
 // Update this list whenever you add/rename/remove categories.
@@ -47,7 +48,7 @@ const navLinks = [
 ];
 
 export function Header() {
-  const { user, profile, signInWithGoogle, signOut, loading } = useAuth();
+  const { user, profile, signOut, loading } = useAuth();
   const { itemCount, items } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -82,10 +83,11 @@ export function Header() {
 
           {/* Right side actions */}
           <div className="flex items-center space-x-4">
+            <SearchDialog />
             {/* Cart */}
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
+                <Button variant="ghost" size="icon" className="relative" aria-label="Open shopping cart">
                   <ShoppingCart className="h-5 w-5" />
                   {itemCount > 0 && (
                     <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
@@ -221,6 +223,8 @@ export function Header() {
               size="icon"
               className="md:hidden"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={mobileMenuOpen}
             >
               {mobileMenuOpen ? (
                 <X className="h-5 w-5" />

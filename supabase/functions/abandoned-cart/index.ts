@@ -2,9 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.58.0";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, X-Cron-Secret",
 };
 
 interface CartItem {
@@ -16,6 +15,7 @@ interface CartItem {
     product: {
       name: string;
       slug: string;
+      base_price: number;
     };
     price_override: number | null;
   };
@@ -31,6 +31,21 @@ interface Cart {
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  if (!cronSecret || req.headers.get("x-cron-secret") !== cronSecret) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   // This edge function is designed to be called by a cron job or scheduled trigger
@@ -68,7 +83,8 @@ Deno.serve(async (req: Request) => {
             price_override,
             product:products (
               name,
-              slug
+              slug,
+              base_price
             )
           )
         )
@@ -112,7 +128,7 @@ Deno.serve(async (req: Request) => {
 
       // Calculate cart total
       const subtotal = cart.items.reduce((sum, item) => {
-        const price = item.variant?.price_override ?? 0;
+        const price = item.variant?.price_override ?? item.variant?.product?.base_price ?? 0;
         return sum + price * item.quantity;
       }, 0);
 

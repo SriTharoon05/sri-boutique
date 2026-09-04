@@ -1,5 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { z } from 'zod';
+
+const productSchema = z.object({
+  name: z.string().trim().min(2).max(160),
+  slug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(180),
+  description: z.string().trim().max(5000).nullable().optional(),
+  base_price: z.number().finite().nonnegative(),
+  category_id: z.string().uuid().nullable().optional(),
+  is_active: z.boolean().default(true),
+  variant: z.object({
+    id: z.string().uuid().optional(),
+    sku: z.string().trim().min(2).max(80),
+    color: z.string().trim().max(80).nullable().optional(),
+    size: z.string().trim().max(40).nullable().optional(),
+    stock_quantity: z.number().int().nonnegative(),
+    image_urls: z.array(z.string().url()).max(8),
+    is_active: z.boolean().default(true),
+  }),
+});
 
 async function verifyAdmin() {
   const supabase = await createClient();
@@ -29,29 +48,29 @@ export async function POST(request: NextRequest) {
   }
 
   const { supabase } = verify;
-  const body = await request.json();
-
-  const { name, slug, description, base_price, category_id, is_active } = body;
-
-  if (!name || !slug || base_price === undefined) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-  }
+  const parsed = productSchema.safeParse(await request.json());
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid product or variant details' }, { status: 400 });
+  const { variant, ...productInput } = parsed.data;
 
   const { data, error } = await supabase
     .from('products')
-    .insert({
-      name,
-      slug,
-      description,
-      base_price,
-      category_id: category_id || null,
-      is_active: is_active ?? true,
-    })
+    .insert(productInput)
     .select()
     .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+
+  const { id: _variantId, ...variantInsert } = variant;
+  const { error: variantError } = await supabase.from('product_variants').insert({
+    ...variantInsert,
+    product_id: data.id,
+  });
+  if (variantError) {
+    await supabase.from('products').delete().eq('id', data.id);
+    return NextResponse.json({ error: variantError.message }, { status: 500 });
   }
 
   return NextResponse.json({ product: data });
@@ -65,12 +84,13 @@ export async function PATCH(request: NextRequest) {
 
   const { supabase } = verify;
   const body = await request.json();
-
-  const { id, ...updates } = body;
-
-  if (!id) {
+  const id = body.id;
+  if (!id || !z.string().uuid().safeParse(id).success) {
     return NextResponse.json({ error: 'Product ID required' }, { status: 400 });
   }
+  const parsed = productSchema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid product or variant details' }, { status: 400 });
+  const { variant, ...updates } = parsed.data;
 
   const { data, error } = await supabase
     .from('products')
@@ -82,6 +102,12 @@ export async function PATCH(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  const variantPayload = { ...variant, product_id: id };
+  const variantResult = variant.id
+    ? await supabase.from('product_variants').update(variantPayload).eq('id', variant.id)
+    : await supabase.from('product_variants').insert(variantPayload);
+  if (variantResult.error) return NextResponse.json({ error: variantResult.error.message }, { status: 500 });
 
   return NextResponse.json({ product: data });
 }

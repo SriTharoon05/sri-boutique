@@ -1,7 +1,9 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { createPublicClient } from '@/lib/supabase/public';
 import { ProductPageContent } from './product-content';
+import { findDemoProduct } from '@/lib/demo-catalog';
+import { absoluteUrl } from '@/lib/site';
 
 // Force fresh data on every request — without this, Next.js may cache
 // this page's Supabase query results, so stock/price changes in the DB
@@ -15,31 +17,33 @@ interface ProductPageProps {
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const supabase = await createClient();
+  const supabase = createPublicClient();
 
-  const { data: product } = await supabase
-    .from('products')
-    .select(`
-      *,
-      category:categories (*)
-    `)
-    .eq('slug', slug)
-    .maybeSingle();
+  const { data: product } = supabase
+    ? await supabase
+        .from('products')
+        .select('*, category:categories (*), variants:product_variants (*)')
+        .eq('slug', slug)
+        .maybeSingle()
+    : { data: null };
+  const resolvedProduct = product || findDemoProduct(slug);
 
-  if (!product) {
+  if (!resolvedProduct) {
     return {
       title: 'Product Not Found',
     };
   }
 
   return {
-    title: `${product.name} | Sri Boutique`,
-    description: product.description || `Shop ${product.name} at Sri Boutique.`,
+    title: resolvedProduct.name,
+    description: resolvedProduct.description || `Shop ${resolvedProduct.name} at Sri Boutique.`,
+    alternates: { canonical: absoluteUrl(`/product/${resolvedProduct.slug}`) },
     openGraph: {
-      title: `${product.name} | Sri Boutique`,
-      description: product.description || `Shop ${product.name} at Sri Boutique.`,
+      title: `${resolvedProduct.name} | Sri Boutique`,
+      description: resolvedProduct.description || `Shop ${resolvedProduct.name} at Sri Boutique.`,
       type: 'website',
-      images: product.variants?.[0]?.image_urls?.[0] ? [{ url: product.variants[0].image_urls[0] }] : [],
+      url: absoluteUrl(`/product/${resolvedProduct.slug}`),
+      images: resolvedProduct.variants?.[0]?.image_urls?.[0] ? [{ url: resolvedProduct.variants[0].image_urls[0] }] : [],
     },
   };
 }
@@ -60,7 +64,7 @@ function generateStructuredData(product: any) {
       price: price,
       priceCurrency: 'INR',
       availability: variant?.stock_quantity > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-      url: `https://sriboutique.com/product/${product.slug}`,
+      url: absoluteUrl(`/product/${product.slug}`),
     },
     aggregateRating: product.avg_rating > 0 ? {
       '@type': 'AggregateRating',
@@ -76,24 +80,23 @@ function generateStructuredData(product: any) {
 
 export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params;
-  const supabase = await createClient();
+  const supabase = createPublicClient();
 
-  const { data: product } = await supabase
-    .from('products')
-    .select(`
-      *,
-      category:categories (*),
-      variants:product_variants (*)
-    `)
-    .eq('slug', slug)
-    .maybeSingle();
+  const { data: product } = supabase
+    ? await supabase
+        .from('products')
+        .select('*, category:categories (*), variants:product_variants (*)')
+        .eq('slug', slug)
+        .maybeSingle()
+    : { data: null };
+  const resolvedProduct = product || findDemoProduct(slug);
 
-  if (!product) {
+  if (!resolvedProduct) {
     notFound();
   }
 
   // Get reviews
-  const { data: reviews } = await supabase
+  const { data: reviews } = supabase && product ? await supabase
     .from('reviews')
     .select(`
       *,
@@ -101,10 +104,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
     `)
     .eq('product_id', product.id)
     .order('created_at', { ascending: false })
-    .limit(10);
+    .limit(10) : { data: [] };
 
   // Get related products
-  const { data: relatedProducts } = await supabase
+  const { data: relatedProducts } = supabase && product ? await supabase
     .from('products')
     .select(`
       *,
@@ -114,9 +117,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
     .eq('category_id', product.category_id)
     .neq('id', product.id)
     .eq('is_active', true)
-    .limit(4);
+    .limit(4) : { data: [] };
 
-  const structuredData = generateStructuredData(product);
+  const structuredData = generateStructuredData(resolvedProduct);
 
   return (
     <>
@@ -125,7 +128,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
       <ProductPageContent
-        product={product}
+        product={resolvedProduct}
         reviews={reviews || []}
         relatedProducts={relatedProducts || []}
       />

@@ -1,12 +1,14 @@
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
+import { MapPin } from 'lucide-react';
+import { STORE_ADDRESS } from '@/lib/site';
 
 const footerLinks = {
   shop: [
-    { label: 'Sarees', href: '/category/sarees' },
-    { label: 'Ethnic Sets', href: '/category/ethnic-sets' },
-    { label: 'Kurtas', href: '/category/kurtas' },
-    { label: 'Accessories', href: '/category/accessories' },
+    { label: 'Silk Sarees', href: '/category/silk-sarees' },
+    { label: 'Cotton Sarees', href: '/category/cotton-sarees' },
+    { label: 'Designer Sarees', href: '/category/designer-sarees' },
+    { label: 'Blouses', href: '/category/blouses' },
   ],
   support: [
     { label: 'Shipping Info', href: '/shipping' },
@@ -38,6 +40,10 @@ export function Footer() {
               Discover exquisite handcrafted sarees and ethnic wear.
               Timeless elegance for the modern woman.
             </p>
+            <address className="not-italic text-sm text-muted-foreground flex gap-2 max-w-xs">
+              <MapPin className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+              <span>{STORE_ADDRESS}</span>
+            </address>
           </div>
 
           {/* Shop */}

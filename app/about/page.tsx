@@ -33,7 +33,7 @@ export default function AboutPage() {
         <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-center mb-20">
           <div className="relative aspect-square rounded-lg overflow-hidden">
             <Image
-              src="https://images.pexels.com/photos/322207/pexels-photo-322207.jpeg"
+              src="/images/sarees/kanchipuram-maroon.png"
               alt="Traditional handloom weaving"
               fill
               sizes="(max-width: 768px) 100vw, 50vw"

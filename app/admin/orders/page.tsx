@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { createClient } from '@/lib/supabase/client';
@@ -58,11 +58,7 @@ export default function AdminOrdersPage() {
     }
   }, [user, profile, authLoading, router]);
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     if (!user || profile?.role !== 'admin') return;
 
     const supabase = createClient();
@@ -81,7 +77,11 @@ export default function AdminOrdersPage() {
       setFilteredOrders(data || []);
     }
     setLoading(false);
-  };
+  }, [user, profile?.role]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   useEffect(() => {
     let filtered = orders;

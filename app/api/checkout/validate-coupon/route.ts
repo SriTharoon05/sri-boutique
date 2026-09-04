@@ -3,13 +3,33 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { code, subtotal } = await request.json();
+    const { code } = await request.json();
 
-    if (!code || subtotal === undefined) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!code || typeof code !== 'string' || code.length > 64) {
+      return NextResponse.json({ error: 'Invalid coupon code' }, { status: 400 });
     }
 
     const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Sign in to apply a coupon' }, { status: 401 });
+
+    const { data: cart } = await supabase
+      .from('carts')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!cart) return NextResponse.json({ error: 'Cart not found' }, { status: 400 });
+
+    const { data: items } = await supabase
+      .from('cart_items')
+      .select('quantity, variant:product_variants(price_override, product:products(base_price))')
+      .eq('cart_id', cart.id);
+
+    const subtotal = (items || []).reduce((sum, item: any) => {
+      const product = Array.isArray(item.variant?.product) ? item.variant.product[0] : item.variant?.product;
+      const price = item.variant?.price_override ?? product?.base_price ?? 0;
+      return sum + Number(price) * item.quantity;
+    }, 0);
 
     const { data: coupon, error } = await supabase
       .from('coupons')
@@ -23,7 +43,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check expiry
-    if (coupon.expiry_date && new Date(coupon.expiry_date) < new Date()) {
+    if (coupon.expiry_date && new Date(coupon.expiry_date) <= new Date()) {
       return NextResponse.json({ error: 'This coupon has expired' }, { status: 400 });
     }
 
@@ -46,6 +66,7 @@ export async function POST(request: NextRequest) {
     } else {
       discount = coupon.discount_value;
     }
+    discount = Math.min(discount, subtotal);
 
     return NextResponse.json({
       valid: true,

@@ -1,7 +1,8 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import { Providers } from './providers';
+import { SITE_NAME, SITE_URL } from '@/lib/site';
 
 const inter = localFont({
   src: [
@@ -28,33 +29,30 @@ const cormorant = localFont({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  applicationName: SITE_NAME,
   title: {
     default: 'Sri Boutique | Premium Ethnic Wear & Sarees',
     template: '%s | Sri Boutique',
   },
   description: 'Discover exquisite handcrafted sarees, ethnic wear, and timeless elegance at Sri Boutique. Premium quality Indian fashion for the modern woman.',
   keywords: ['sarees', 'ethnic wear', 'Indian fashion', 'boutique', 'handloom', 'silk sarees', 'designer wear'],
+  alternates: { canonical: '/' },
+  category: 'shopping',
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
   openGraph: {
     type: 'website',
     locale: 'en_IN',
-    url: 'https://sriboutique.com',
+    url: SITE_URL,
     siteName: 'Sri Boutique',
     title: 'Sri Boutique | Premium Ethnic Wear & Sarees',
     description: 'Discover exquisite handcrafted sarees, ethnic wear, and timeless elegance at Sri Boutique.',
-    images: [
-      {
-        url: '/og-image.jpg',
-        width: 1200,
-        height: 630,
-        alt: 'Sri Boutique - Premium Ethnic Wear',
-      },
-    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Sri Boutique | Premium Ethnic Wear & Sarees',
     description: 'Discover exquisite handcrafted sarees, ethnic wear, and timeless elegance at Sri Boutique.',
-    images: ['/og-image.jpg'],
   },
   robots: {
     index: true,
@@ -69,13 +67,39 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#7f1d1d',
+};
+
+const localBusinessSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'ClothingStore',
+  name: SITE_NAME,
+  url: SITE_URL,
+  address: {
+    '@type': 'PostalAddress',
+    streetAddress: 'Sidco Nagar 9th Street, Villivakkam',
+    addressLocality: 'Chennai',
+    addressRegion: 'Tamil Nadu',
+    addressCountry: 'IN',
+  },
+};
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${cormorant.variable}`}>
+    <html lang="en-IN" className={`${inter.variable} ${cormorant.variable}`}>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessSchema) }}
+        />
+      </head>
       <body className="font-body min-h-screen bg-background antialiased">
         <Providers>{children}</Providers>
       </body>

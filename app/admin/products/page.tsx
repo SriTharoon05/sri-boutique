@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { createClient } from '@/lib/supabase/client';
@@ -10,6 +10,7 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -41,6 +42,12 @@ export default function AdminProductsPage() {
     base_price: 0,
     category_id: '',
     is_active: true,
+    variant_id: '',
+    sku: '',
+    color: '',
+    size: 'Free Size',
+    stock_quantity: 0,
+    image_urls: '',
   });
 
   useEffect(() => {
@@ -51,11 +58,7 @@ export default function AdminProductsPage() {
     }
   }, [user, profile, authLoading, router]);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!user || profile?.role !== 'admin') return;
 
     const supabase = createClient();
@@ -76,7 +79,11 @@ export default function AdminProductsPage() {
     setProducts(productsData || []);
     setCategories(categoriesData || []);
     setLoading(false);
-  };
+  }, [user, profile?.role]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const generateSlug = (name: string) => {
     return name
@@ -85,7 +92,8 @@ export default function AdminProductsPage() {
       .replace(/(^-|-$)/g, '');
   };
 
-  const handleEdit = (product: Product) => {
+  const handleEdit = (product: Product & { variants?: ProductVariant[] }) => {
+    const variant = product.variants?.[0];
     setEditingProduct(product);
     setFormData({
       name: product.name,
@@ -94,6 +102,12 @@ export default function AdminProductsPage() {
       base_price: product.base_price,
       category_id: product.category_id || '',
       is_active: product.is_active,
+      variant_id: variant?.id || '',
+      sku: variant?.sku || '',
+      color: variant?.color || '',
+      size: variant?.size || 'Free Size',
+      stock_quantity: variant?.stock_quantity || 0,
+      image_urls: variant?.image_urls?.join('\n') || '',
     });
     setEditDialogOpen(true);
   };
@@ -107,50 +121,49 @@ export default function AdminProductsPage() {
       base_price: 0,
       category_id: categories[0]?.id || '',
       is_active: true,
+      variant_id: '',
+      sku: '',
+      color: '',
+      size: 'Free Size',
+      stock_quantity: 0,
+      image_urls: '',
     });
     setEditDialogOpen(true);
   };
 
   const handleSave = async () => {
-    if (!formData.name || !formData.slug) {
-      toast.error('Name and slug are required');
+    if (!formData.name || !formData.slug || !formData.sku) {
+      toast.error('Name, slug, and SKU are required');
       return;
     }
 
     setSaving(true);
-    const supabase = createClient();
-
     try {
-      if (editingProduct) {
-        const { error } = await supabase
-          .from('products')
-          .update({
-            name: formData.name,
-            slug: formData.slug,
-            description: formData.description,
-            base_price: formData.base_price,
-            category_id: formData.category_id || null,
-            is_active: formData.is_active,
-          })
-          .eq('id', editingProduct.id);
-
-        if (error) throw error;
-        toast.success('Product updated');
-      } else {
-        const { error } = await supabase
-          .from('products')
-          .insert({
-            name: formData.name,
-            slug: formData.slug,
-            description: formData.description,
-            base_price: formData.base_price,
-            category_id: formData.category_id || null,
-            is_active: formData.is_active,
-          });
-
-        if (error) throw error;
-        toast.success('Product created');
-      }
+      const response = await fetch('/api/admin/products', {
+        method: editingProduct ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...(editingProduct ? { id: editingProduct.id } : {}),
+          name: formData.name,
+          slug: formData.slug,
+          description: formData.description,
+          base_price: formData.base_price,
+          category_id: formData.category_id || null,
+          is_active: formData.is_active,
+          variant: {
+            ...(formData.variant_id ? { id: formData.variant_id } : {}),
+            sku: formData.sku,
+            color: formData.color || null,
+            size: formData.size || null,
+            stock_quantity: formData.stock_quantity,
+            image_urls: formData.image_urls.split(/\r?\n|,/).map((url) => url.trim()).filter(Boolean),
+            is_active: true,
+          },
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to save product');
+      toast.success(editingProduct ? 'Product updated' : 'Product created');
 
       setEditDialogOpen(false);
       fetchData();
@@ -295,6 +308,30 @@ export default function AdminProductsPage() {
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>SKU</Label>
+                  <Input value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })} />
+                </div>
+                <div>
+                  <Label>Stock</Label>
+                  <Input type="number" min="0" value={formData.stock_quantity} onChange={(e) => setFormData({ ...formData, stock_quantity: Math.max(0, parseInt(e.target.value) || 0) })} />
+                </div>
+                <div>
+                  <Label>Colour</Label>
+                  <Input value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Size</Label>
+                  <Input value={formData.size} onChange={(e) => setFormData({ ...formData, size: e.target.value })} />
+                </div>
+              </div>
+
+              <div>
+                <Label>Image URLs (one per line)</Label>
+                <Textarea value={formData.image_urls} onChange={(e) => setFormData({ ...formData, image_urls: e.target.value })} placeholder="https://…" />
+              </div>
+
               <div>
                 <Label>Slug</Label>
                 <Input
@@ -305,7 +342,7 @@ export default function AdminProductsPage() {
 
               <div>
                 <Label>Description</Label>
-                <Input
+                <Textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />

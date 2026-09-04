@@ -7,156 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { ArrowRight, Star, Truck, Shield, Headphones } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { Category, Product, ProductVariant } from '@/types/database';
-
-// Demo data for when database is empty
-const demoCategories: (Category & { _count?: number })[] = [
-  {
-    id: '1',
-    name: 'Silk Sarees',
-    slug: 'silk-sarees',
-    description: 'Luxurious silk sarees handwoven by master craftsmen',
-    parent_id: null,
-    image_url: 'https://images.pexels.com/photos/1078983/pexels-photo-1078983.jpeg',
-    created_at: new Date().toISOString(),
-    _count: 45,
-  },
-  {
-    id: '2',
-    name: 'Designer Sarees',
-    slug: 'designer-sarees',
-    description: 'Contemporary designs with traditional craftsmanship',
-    parent_id: null,
-    image_url: 'https://images.pexels.com/photos/1647920/pexels-photo-1647920.jpeg',
-    created_at: new Date().toISOString(),
-    _count: 38,
-  },
-  {
-    id: '3',
-    name: 'Ethnic Sets',
-    slug: 'ethnic-sets',
-    description: 'Complete ethnic ensembles for every occasion',
-    parent_id: null,
-    image_url: 'https://images.pexels.com/photos/994517/pexels-photo-994517.jpeg',
-    created_at: new Date().toISOString(),
-    _count: 52,
-  },
-  {
-    id: '4',
-    name: 'Kurtas',
-    slug: 'kurtas',
-    description: 'Elegant kurtas for everyday wear',
-    parent_id: null,
-    image_url: 'https://images.pexels.com/photos/769770/pexels-photo-769770.jpeg',
-    created_at: new Date().toISOString(),
-    _count: 67,
-  },
-];
-
-const demoProducts: (Product & { variants: ProductVariant[], category: Category | null })[] = [
-  {
-    id: '1',
-    name: 'Royal Banarasi Silk Saree',
-    slug: 'royal-banarasi-silk-saree',
-    description: 'Handwoven Banarasi silk saree with intricate gold zari work. Perfect for weddings and special occasions.',
-    base_price: 25999,
-    category_id: '1',
-    is_active: true,
-    avg_rating: 4.8,
-    review_count: 124,
-    created_at: new Date().toISOString(),
-    category: demoCategories[0],
-    variants: [{
-      id: '1',
-      product_id: '1',
-      sku: 'RBS-001',
-      color: 'Maroon',
-      size: 'Free',
-      stock_quantity: 10,
-      image_urls: ['https://images.pexels.com/photos/1078983/pexels-photo-1078983.jpeg'],
-      is_active: true,
-      created_at: new Date().toISOString(),
-      price_override: null,
-    }],
-  },
-  {
-    id: '2',
-    name: 'Contemporary Block Print Set',
-    slug: 'contemporary-block-print-set',
-    description: 'Modern silhouette with traditional block print. Includes kurta, palazzo, and dupatta.',
-    base_price: 8999,
-    category_id: '3',
-    is_active: true,
-    avg_rating: 4.6,
-    review_count: 89,
-    created_at: new Date().toISOString(),
-    category: demoCategories[2],
-    variants: [{
-      id: '2',
-      product_id: '2',
-      sku: 'CPS001',
-      color: 'Navy Blue',
-      size: 'M',
-      stock_quantity: 15,
-      image_urls: ['https://images.pexels.com/photos/994517/pexels-photo-994517.jpeg'],
-      is_active: true,
-      created_at: new Date().toISOString(),
-      price_override: null,
-    }],
-  },
-  {
-    id: '3',
-    name: 'Chanderi Cotton Saree',
-    slug: 'chanderi-cotton-saree',
-    description: 'Lightweight Chanderi cotton saree with subtle embroidery. Ideal for casual elegance.',
-    base_price: 7499,
-    category_id: '1',
-    is_active: true,
-    avg_rating: 4.5,
-    review_count: 67,
-    created_at: new Date().toISOString(),
-    category: demoCategories[0],
-    variants: [{
-      id: '3',
-      product_id: '3',
-      sku: 'CCS001',
-      color: 'Peach',
-      size: 'Free',
-      stock_quantity: 8,
-      image_urls: ['https://images.pexels.com/photos/1647920/pexels-photo-1647920.jpeg'],
-      is_active: true,
-      created_at: new Date().toISOString(),
-      price_override: null,
-    }],
-  },
-  {
-    id: '4',
-    name: 'Embroidered Anarkali Set',
-    slug: 'embroidered-anarkali-set',
-    description: 'Floor-length Anarkali with intricate thread embroidery. Perfect for festive celebrations.',
-    base_price: 14999,
-    category_id: '3',
-    is_active: true,
-    avg_rating: 4.9,
-    review_count: 156,
-    created_at: new Date().toISOString(),
-    category: demoCategories[2],
-    variants: [{
-      id: '4',
-      product_id: '4',
-      sku: 'EAS001',
-      color: 'Teal',
-      size: 'L',
-      stock_quantity: 12,
-      image_urls: ['https://images.pexels.com/photos/769770/pexels-photo-769770.jpeg'],
-      is_active: true,
-      created_at: new Date().toISOString(),
-      price_override: null,
-    }],
-  },
-];
+import type { Category } from '@/types/database';
+import type { CatalogProduct } from '@/lib/demo-catalog';
+import { useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -172,46 +27,48 @@ const staggerContainer = {
   },
 };
 
-export function HomePageContent() {
-  const [categories, setCategories] = useState<(Category & { _count?: number })[]>([]);
-  const [products, setProducts] = useState<(Product & { variants: ProductVariant[], category: Category | null })[]>([]);
-  const [loading, setLoading] = useState(true);
+interface HomePageContentProps {
+  categories: (Category & { _count?: number })[];
+  products: CatalogProduct[];
+}
 
-  useEffect(() => {
-    async function fetchData() {
-      const supabase = createClient();
+export function HomePageContent({ categories, products }: HomePageContentProps) {
+  const [email, setEmail] = useState('');
+  const [subscribing, setSubscribing] = useState(false);
 
-      const { data: categoriesData } = await supabase
-        .from('categories')
-        .select('*')
-        .is('parent_id', null)
-        .limit(4);
-
-      const { data: productsData } = await supabase
-        .from('products')
-        .select(`
-          *,
-          category:categories (*),
-          variants:product_variants (*)
-        `)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(4);
-
-      setCategories(categoriesData?.length ? categoriesData : demoCategories);
-      setProducts(productsData?.length ? productsData : demoProducts);
-      setLoading(false);
+  const subscribe = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubscribing(true);
+    try {
+      const response = await fetch('/api/newsletter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not subscribe');
+      setEmail('');
+      toast.success('You are subscribed to Sri Boutique updates');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not subscribe');
+    } finally {
+      setSubscribing(false);
     }
-
-    fetchData();
-  }, []);
+  };
 
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
       <section className="relative h-[85vh] min-h-[600px] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/10" />
-        <div className="absolute inset-0 bg-[url('https://images.pexels.com/photos/1647920/pexels-photo-1647920.jpeg')] bg-cover bg-center opacity-20" />
+        <Image
+          src="/images/sarees/banarasi-peacock.png"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-center opacity-20"
+        />
 
         <div className="container mx-auto px-4 relative z-10">
           <motion.div
@@ -271,7 +128,7 @@ export function HomePageContent() {
             {[
               { icon: Truck, title: 'Free Shipping', desc: 'Orders over ₹2000' },
               { icon: Shield, title: 'Secure Payment', desc: '100% protected' },
-              { icon: Headphones, title: '24/7 Support', desc: 'Always here to help' },
+              { icon: Headphones, title: 'Personal Support', desc: 'Help when you need it' },
               { icon: Star, title: 'Premium Quality', desc: 'Handcrafted products' },
             ].map((item, index) => (
               <motion.div
@@ -454,7 +311,7 @@ export function HomePageContent() {
             >
               <div className="aspect-square rounded-lg overflow-hidden">
                 <Image
-                  src="https://images.pexels.com/photos/322207/pexels-photo-322207.jpeg"
+                  src="/images/sarees/handloom-mustard.png"
                   alt="Traditional handloom weaving"
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"
@@ -495,16 +352,16 @@ export function HomePageContent() {
 
               <div className="flex flex-wrap gap-6 pt-4">
                 <div>
-                  <p className="font-display text-3xl font-semibold text-primary">500+</p>
-                  <p className="text-sm text-muted-foreground">Artisans</p>
+                  <p className="font-display text-2xl font-semibold text-primary">Handpicked</p>
+                  <p className="text-sm text-muted-foreground">Curated collections</p>
                 </div>
                 <div>
-                  <p className="font-display text-3xl font-semibold text-primary">15K+</p>
-                  <p className="text-sm text-muted-foreground">Happy Customers</p>
+                  <p className="font-display text-2xl font-semibold text-primary">Quality checked</p>
+                  <p className="text-sm text-muted-foreground">Before dispatch</p>
                 </div>
                 <div>
-                  <p className="font-display text-3xl font-semibold text-primary">10+</p>
-                  <p className="text-sm text-muted-foreground">Years of Excellence</p>
+                  <p className="font-display text-2xl font-semibold text-primary">Pan-India</p>
+                  <p className="text-sm text-muted-foreground">Secure delivery</p>
                 </div>
               </div>
 
@@ -538,11 +395,22 @@ export function HomePageContent() {
               and styling tips from our experts.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-              <Button size="lg" variant="secondary" className="flex-1">
-                Subscribe Now
+            <form onSubmit={subscribe} className="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto">
+              <label htmlFor="newsletter-email" className="sr-only">Email address</label>
+              <Input
+                id="newsletter-email"
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="h-11 bg-background text-foreground"
+              />
+              <Button type="submit" size="lg" variant="secondary" disabled={subscribing}>
+                {subscribing ? 'Subscribing…' : 'Subscribe'}
               </Button>
-            </div>
+            </form>
           </motion.div>
         </div>
       </section>

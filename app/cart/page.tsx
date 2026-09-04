@@ -7,6 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '@/components/providers/cart-provider';
+import { useAuth } from '@/components/providers/auth-provider';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -17,6 +18,7 @@ import { toast } from 'sonner';
 
 export default function CartPage() {
   const { items, itemCount, subtotal, loading, updateQuantity, removeItem, clearCart } = useCart();
+  const { user } = useAuth();
   const [couponCode, setCouponCode] = useState('');
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [discount, setDiscount] = useState(0);
@@ -27,13 +29,17 @@ export default function CartPage() {
       toast.error('Please enter a coupon code');
       return;
     }
+    if (!user) {
+      toast.error('Sign in before applying a coupon');
+      return;
+    }
 
     setApplyingCoupon(true);
     try {
       const res = await fetch('/api/checkout/validate-coupon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: couponCode, subtotal }),
+        body: JSON.stringify({ code: couponCode }),
       });
 
       const data = await res.json();
@@ -289,7 +295,7 @@ export default function CartPage() {
                 </div>
 
                 <Button asChild size="lg" className="w-full">
-                  <Link href="/checkout">
+                  <Link href={couponApplied ? `/checkout?coupon=${encodeURIComponent(couponCode)}` : '/checkout'}>
                     Proceed to Checkout
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>

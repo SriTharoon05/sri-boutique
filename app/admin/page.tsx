@@ -62,7 +62,10 @@ export default function AdminPage() {
         .select('id', { count: 'exact', head: true })
         .eq('status', 'pending');
 
-      const totalRevenue = revenueData?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
+      const totalRevenue = revenueData?.reduce(
+        (sum: number, order: { total: number | null }) => sum + Number(order.total || 0),
+        0,
+      ) || 0;
 
       setStats({
         totalProducts: productCount || 0,

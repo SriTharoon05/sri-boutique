@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/components/providers/cart-provider';
 import { useAuth } from '@/components/providers/auth-provider';
-import { createClient } from '@/lib/supabase/client';
 import { Product, ProductVariant, Category, Review } from '@/types/database';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
@@ -22,31 +21,14 @@ interface ProductPageContentProps {
   relatedProducts: (Product & { category: Category | null; variants: ProductVariant[] })[];
 }
 
-// Demo variant for empty database
-const demoVariant: ProductVariant = {
-  id: 'demo',
-  product_id: 'demo',
-  sku: 'DEMO-001',
-  color: 'Maroon',
-  size: 'Free Size',
-  stock_quantity: 10,
-  image_urls: [
-    'https://images.pexels.com/photos/1078983/pexels-photo-1078983.jpeg',
-    'https://images.pexels.com/photos/1647920/pexels-photo-1647920.jpeg',
-    'https://images.pexels.com/photos/322207/pexels-photo-322207.jpeg',
-  ],
-  is_active: true,
-  created_at: new Date().toISOString(),
-  price_override: null,
-};
-
 export function ProductPageContent({ product, reviews, relatedProducts }: ProductPageContentProps) {
   const { addItem, loading: cartLoading } = useCart();
   const { user } = useAuth();
   const router = useRouter();
 
-  const variants = product.variants?.length > 0 ? product.variants : [demoVariant];
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant>(variants[0]);
+  const isDemo = product.id.startsWith('demo-');
+  const variants = product.variants;
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(variants[0] || null);
   const [selectedColor, setSelectedColor] = useState<string>(variants[0]?.color || '');
   const [selectedSize, setSelectedSize] = useState<string>(variants[0]?.size || '');
   const [quantity, setQuantity] = useState(1);
@@ -54,45 +36,54 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
   const [addingToCart, setAddingToCart] = useState(false);
   const [inWishlist, setInWishlist] = useState(false);
 
-  const images = selectedVariant?.image_urls?.length > 0
-    ? selectedVariant.image_urls
-    : ['https://images.pexels.com/photos/1078983/pexels-photo-1078983.jpeg'];
+  const variantImages = selectedVariant?.image_urls || [];
+  const images = variantImages.length > 0
+    ? variantImages
+    : ['/images/sarees/kanchipuram-maroon.png'];
 
   const currentPrice = selectedVariant?.price_override ?? product.base_price;
   const colors = Array.from(new Set(variants.map(v => v.color).filter(Boolean))) as string[];
   const sizes = Array.from(new Set(variants.map(v => v.size).filter(Boolean))) as string[];
-
-  const getVariantKey = (color: string, size: string) => `${color}-${size}`;
 
   useEffect(() => {
     if (selectedColor && selectedSize) {
       const variant = variants.find(
         v => v.color === selectedColor && v.size === selectedSize
       );
-      if (variant) {
-        setSelectedVariant(variant);
-        setSelectedImageIndex(0);
-      }
+      setSelectedVariant(variant || null);
+      setSelectedImageIndex(0);
+      if (variant) setQuantity((current) => Math.min(current, Math.max(1, variant.stock_quantity)));
     }
   }, [selectedColor, selectedSize, variants]);
 
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem('sb_wishlist') || '[]') as string[];
+    setInWishlist(saved.includes(product.id));
+  }, [product.id]);
+
   const handleAddToCart = async () => {
+    if (isDemo) {
+      toast.info('This is a demo product. Add your live inventory in the admin area to enable checkout.');
+      return false;
+    }
     if (!selectedVariant) {
       toast.error('Please select a variant');
-      return;
+      return false;
     }
 
     if (selectedVariant.stock_quantity < quantity) {
       toast.error('Not enough stock available');
-      return;
+      return false;
     }
 
     setAddingToCart(true);
     try {
       await addItem(selectedVariant.id, quantity);
       toast.success('Added to cart');
+      return true;
     } catch {
       toast.error('Failed to add to cart');
+      return false;
     } finally {
       setAddingToCart(false);
     }
@@ -104,8 +95,30 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
       return;
     }
 
-    await handleAddToCart();
-    router.push('/checkout');
+    if (await handleAddToCart()) router.push('/checkout');
+  };
+
+  const toggleWishlist = () => {
+    const saved = new Set(JSON.parse(localStorage.getItem('sb_wishlist') || '[]') as string[]);
+    if (saved.has(product.id)) saved.delete(product.id);
+    else saved.add(product.id);
+    localStorage.setItem('sb_wishlist', JSON.stringify(Array.from(saved)));
+    const nextValue = saved.has(product.id);
+    setInWishlist(nextValue);
+    toast.success(nextValue ? 'Added to wishlist' : 'Removed from wishlist');
+  };
+
+  const shareProduct = async () => {
+    const shareData = { title: product.name, text: product.description || product.name, url: window.location.href };
+    try {
+      if (navigator.share) await navigator.share(shareData);
+      else {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success('Product link copied');
+      }
+    } catch (error) {
+      if ((error as DOMException).name !== 'AbortError') toast.error('Could not share this product');
+    }
   };
 
   const avgRating = product.avg_rating || 0;
@@ -165,6 +178,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
                     size="icon"
                     className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white"
                     onClick={() => setSelectedImageIndex(prev => (prev - 1 + images.length) % images.length)}
+                    aria-label="Previous product image"
                   >
                     <ChevronLeft className="h-5 w-5" />
                   </Button>
@@ -173,6 +187,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
                     size="icon"
                     className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white"
                     onClick={() => setSelectedImageIndex(prev => (prev + 1) % images.length)}
+                    aria-label="Next product image"
                   >
                     <ChevronRight className="h-5 w-5" />
                   </Button>
@@ -184,10 +199,8 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
                 variant="ghost"
                 size="icon"
                 className="absolute top-4 right-4 bg-white/80 hover:bg-white"
-                onClick={() => {
-                  setInWishlist(!inWishlist);
-                  toast.success(inWishlist ? 'Removed from wishlist' : 'Added to wishlist');
-                }}
+                onClick={toggleWishlist}
+                aria-label={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
               >
                 <Heart className={`h-5 w-5 ${inWishlist ? 'fill-red-500 text-red-500' : ''}`} />
               </Button>
@@ -200,6 +213,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
                   <button
                     key={index}
                     onClick={() => setSelectedImageIndex(index)}
+                    aria-label={`View product image ${index + 1}`}
                     className={`relative w-20 h-24 flex-shrink-0 rounded-md overflow-hidden ${
                       selectedImageIndex === index ? 'ring-2 ring-primary' : ''
                     }`}
@@ -293,7 +307,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Size</span>
-                  <button className="text-sm text-primary hover:underline">Size Guide</button>
+                  <Link href="/size-guide" className="text-sm text-primary hover:underline">Size Guide</Link>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {sizes.map((size) => (
@@ -351,16 +365,16 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
                 size="lg"
                 className="flex-1"
                 onClick={handleAddToCart}
-                disabled={addingToCart || !selectedVariant || selectedVariant.stock_quantity === 0}
+                disabled={addingToCart || !selectedVariant || selectedVariant.stock_quantity === 0 || isDemo}
               >
-                {addingToCart ? 'Adding...' : 'Add to Cart'}
+                {isDemo ? 'Demo Product' : addingToCart ? 'Adding...' : 'Add to Cart'}
               </Button>
               <Button
                 size="lg"
                 variant="outline"
                 className="flex-1"
                 onClick={handleBuyNow}
-                disabled={!selectedVariant || selectedVariant.stock_quantity === 0}
+                disabled={!selectedVariant || selectedVariant.stock_quantity === 0 || isDemo}
               >
                 Buy Now
               </Button>
@@ -368,7 +382,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
 
             {/* Share */}
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" className="gap-2">
+              <Button variant="ghost" size="sm" className="gap-2" onClick={shareProduct}>
                 <Share2 className="h-4 w-4" />
                 Share
               </Button>

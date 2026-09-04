@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from './auth-provider';
-import { Cart, CartItem, ProductVariant, Product } from '@/types/database';
+import { CartItem, ProductVariant, Product } from '@/types/database';
 
 interface CartItemWithDetails extends CartItem {
   variant: ProductVariant & {
@@ -29,15 +29,22 @@ interface CartContextType extends CartState {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-function getSessionId(): string {
-  if (typeof window === 'undefined') return '';
+const GUEST_CART_KEY = 'sb_guest_cart';
 
-  let sessionId = sessionStorage.getItem('sb_session_id');
-  if (!sessionId) {
-    sessionId = crypto.randomUUID();
-    sessionStorage.setItem('sb_session_id', sessionId);
+interface StoredGuestItem { variantId: string; quantity: number }
+
+function getGuestItems(): StoredGuestItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const value = JSON.parse(localStorage.getItem(GUEST_CART_KEY) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
   }
-  return sessionId;
+}
+
+function setGuestItems(items: StoredGuestItem[]) {
+  localStorage.setItem(GUEST_CART_KEY, JSON.stringify(items));
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
@@ -63,14 +70,38 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const fetchCart = useCallback(async () => {
     if (typeof window === 'undefined') return;
 
-    const sessionId = getSessionId();
-    let query = supabase.from('carts').select('id');
+    if (!user) {
+      const storedItems = getGuestItems();
+      if (!storedItems.length) {
+        setState({ cartId: null, items: [], itemCount: 0, subtotal: 0, loading: false });
+        return;
+      }
 
-    if (user) {
-      query = query.eq('user_id', user.id).is('session_id', null);
-    } else {
-      query = query.eq('session_id', sessionId).is('user_id', null);
+      const { data: variants } = await supabase
+        .from('product_variants')
+        .select('*, product:products (*)')
+        .in('id', storedItems.map((item) => item.variantId));
+
+      const items = (variants || []).map((variant: any) => {
+        const stored = storedItems.find((item) => item.variantId === variant.id)!;
+        return {
+          id: `local:${variant.id}`,
+          cart_id: 'local',
+          variant_id: variant.id,
+          quantity: stored.quantity,
+          created_at: new Date(0).toISOString(),
+          variant: {
+            ...variant,
+            product: Array.isArray(variant.product) ? variant.product[0] : variant.product,
+          },
+        } as CartItemWithDetails;
+      });
+      const totals = calculateTotals(items);
+      setState({ cartId: null, items, ...totals, loading: false });
+      return;
     }
+
+    const query = supabase.from('carts').select('id').eq('user_id', user.id).is('session_id', null).order('updated_at', { ascending: false }).limit(1);
 
     const { data: carts } = await query.maybeSingle();
 
@@ -90,7 +121,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       `)
       .eq('cart_id', carts.id);
 
-    const cartItems = (items || []).map(item => ({
+    const cartItems = (items || []).map((item: any) => ({
       ...item,
       variant: {
         ...item.variant,
@@ -113,54 +144,45 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const mergeGuestCart = useCallback(async () => {
     if (!user) return;
 
-    const sessionId = getSessionId();
-    const { data: guestCart } = await supabase
-      .from('carts')
-      .select('id')
-      .eq('session_id', sessionId)
-      .is('user_id', null)
-      .maybeSingle();
-
-    if (!guestCart) return;
+    const guestItems = getGuestItems();
+    if (!guestItems.length) return;
 
     const { data: userCart } = await supabase
       .from('carts')
       .select('id')
       .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    // Get guest cart items
-    const { data: guestItems } = await supabase
-      .from('cart_items')
-      .select('*')
-      .eq('cart_id', guestCart.id);
-
-    if (!guestItems?.length) {
-      await supabase.from('carts').delete().eq('id', guestCart.id);
-      return;
-    }
-
-    if (userCart) {
-      // Move items to user cart
-      for (const item of guestItems) {
-        await supabase.from('cart_items').upsert({
-          cart_id: userCart.id,
-          variant_id: item.variant_id,
-          quantity: item.quantity,
-        }, {
-          onConflict: 'cart_id,variant_id',
-        });
-      }
-      await supabase.from('carts').delete().eq('id', guestCart.id);
-    } else {
-      // Update guest cart to user cart
-      await supabase
+    let cartId = userCart?.id;
+    if (!cartId) {
+      const { data: created } = await supabase
         .from('carts')
-        .update({ user_id: user.id, session_id: null })
-        .eq('id', guestCart.id);
+        .insert({ user_id: user.id, session_id: null })
+        .select('id')
+        .single();
+      cartId = created?.id;
     }
 
-    sessionStorage.removeItem('sb_session_id');
+    if (!cartId) return;
+
+    for (const item of guestItems) {
+      const { data: existing } = await supabase
+        .from('cart_items')
+        .select('id, quantity')
+        .eq('cart_id', cartId)
+        .eq('variant_id', item.variantId)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase.from('cart_items').update({ quantity: existing.quantity + item.quantity }).eq('id', existing.id);
+      } else {
+        await supabase.from('cart_items').insert({ cart_id: cartId, variant_id: item.variantId, quantity: item.quantity });
+      }
+    }
+
+    localStorage.removeItem(GUEST_CART_KEY);
   }, [user, supabase]);
 
   useEffect(() => {
@@ -172,20 +194,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [user, fetchCart, mergeGuestCart]);
 
   const ensureCart = async (): Promise<string> => {
+    if (!user) throw new Error('A database cart requires an authenticated user');
     if (state.cartId) return state.cartId;
-
-    const sessionId = user ? null : getSessionId();
 
     const { data: newCart, error } = await supabase
       .from('carts')
       .insert({
         user_id: user?.id ?? null,
-        session_id: sessionId,
+        session_id: null,
       })
       .select('id')
       .single();
 
-    if (error || !newCart) throw error;
+    if (error || !newCart) {
+      const { data: existingCart } = await supabase.from('carts').select('id').eq('user_id', user.id).maybeSingle();
+      if (existingCart) return existingCart.id;
+      throw error;
+    }
 
     setState(prev => ({ ...prev, cartId: newCart.id }));
     return newCart.id;
@@ -193,6 +218,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const addItem = async (variantId: string, quantity: number = 1) => {
     try {
+      if (!user) {
+        const items = getGuestItems();
+        const existing = items.find((item) => item.variantId === variantId);
+        if (existing) existing.quantity += quantity;
+        else items.push({ variantId, quantity });
+        setGuestItems(items);
+        await fetchCart();
+        return;
+      }
+
       const cartId = await ensureCart();
 
       const { data: existing } = await supabase
@@ -228,6 +263,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (!user && itemId.startsWith('local:')) {
+      const variantId = itemId.slice('local:'.length);
+      setGuestItems(getGuestItems().map((item) => item.variantId === variantId ? { ...item, quantity } : item));
+      await fetchCart();
+      return;
+    }
+
     await supabase
       .from('cart_items')
       .update({ quantity })
@@ -237,11 +279,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const removeItem = async (itemId: string) => {
+    if (!user && itemId.startsWith('local:')) {
+      const variantId = itemId.slice('local:'.length);
+      setGuestItems(getGuestItems().filter((item) => item.variantId !== variantId));
+      await fetchCart();
+      return;
+    }
+
     await supabase.from('cart_items').delete().eq('id', itemId);
     await fetchCart();
   };
 
   const clearCart = async () => {
+    if (!user) {
+      localStorage.removeItem(GUEST_CART_KEY);
+      await fetchCart();
+      return;
+    }
+
     if (state.cartId) {
       await supabase.from('cart_items').delete().eq('cart_id', state.cartId);
       await fetchCart();

@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { MainLayout } from '@/components/layout/main-layout';
+import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'Shipping Info | Sri Boutique',
@@ -43,9 +44,9 @@ export default function ShippingPage() {
             <p>
               Once your order ships, you&apos;ll receive a tracking link via email
               and it will also be available on your{' '}
-              <a href="/account/orders" className="text-primary hover:underline">
+              <Link href="/account/orders" className="text-primary hover:underline">
                 Orders page
-              </a>
+              </Link>
               . You can track your shipment&apos;s progress in real time from
               there.
             </p>

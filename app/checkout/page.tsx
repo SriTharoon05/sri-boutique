@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/components/providers/auth-provider';
 import { useCart } from '@/components/providers/cart-provider';
@@ -13,7 +13,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, CreditCard, MapPin, Phone } from 'lucide-react';
+import { Loader2, CreditCard, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FormData {
@@ -25,6 +25,15 @@ interface FormData {
   pincode: string;
   country: string;
   phone: string;
+}
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => {
+      open: () => void;
+      on: (event: string, callback: () => void) => void;
+    };
+  }
 }
 
 const initialFormData: FormData = {
@@ -42,14 +51,14 @@ export default function CheckoutPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const { items, subtotal, loading: cartLoading, refreshCart } = useCart();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [formStep, setFormStep] = useState(0);
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [formErrors, setFormErrors] = useState<Partial<FormData>>({});
   const [submitting, setSubmitting] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
-  const [razorpayOrderId, setRazorpayOrderId] = useState<string | null>(null);
   const [discount, setDiscount] = useState(0);
+  const [couponId, setCouponId] = useState<string | null>(null);
 
   // Tracks whether checkout has already succeeded, so the "cart is
   // empty, redirect to /cart" effect below knows to stand down instead of
@@ -83,6 +92,24 @@ export default function CheckoutPage() {
   const shipping = subtotal > 2000 ? 0 : 99;
   const total = subtotal - discount + shipping;
 
+  useEffect(() => {
+    const code = searchParams.get('coupon');
+    if (!code || !user || cartLoading) return;
+
+    fetch('/api/checkout/validate-coupon', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    })
+      .then(async (response) => ({ response, data: await response.json() }))
+      .then(({ response, data }) => {
+        if (!response.ok) throw new Error(data.error || 'Coupon is no longer valid');
+        setDiscount(data.discount);
+        setCouponId(data.couponId);
+      })
+      .catch((error) => toast.error(error.message));
+  }, [searchParams, subtotal, user, cartLoading]);
+
   const validateForm = (): boolean => {
     const errors: Partial<FormData> = {};
 
@@ -108,39 +135,38 @@ export default function CheckoutPage() {
     setSubmitting(true);
 
     try {
-      // Create order
-      const orderRes = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          shippingAddress: {
-            fullName: formData.fullName,
-            addressLine1: formData.addressLine1,
-            addressLine2: formData.addressLine2,
-            city: formData.city,
-            state: formData.state,
-            pincode: formData.pincode,
-            country: formData.country,
-          },
-          phone: formData.phone,
-          couponId: null,
-        }),
-      });
+      let currentOrderId = orderId;
+      if (!currentOrderId) {
+        const orderRes = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shippingAddress: {
+              fullName: formData.fullName,
+              addressLine1: formData.addressLine1,
+              addressLine2: formData.addressLine2,
+              city: formData.city,
+              state: formData.state,
+              pincode: formData.pincode,
+              country: formData.country,
+            },
+            phone: formData.phone,
+            couponId,
+          }),
+        });
 
-      const orderData = await orderRes.json();
-
-      if (!orderRes.ok) {
-        throw new Error(orderData.error || 'Failed to create order');
+        const orderData = await orderRes.json();
+        if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create order');
+        currentOrderId = orderData.order.id as string;
+        setOrderId(currentOrderId);
       }
-
-      const currentOrderId: string = orderData.order.id;
-      setOrderId(currentOrderId);
+      if (!currentOrderId) throw new Error('Could not create order');
+      const verifiedOrderId = currentOrderId;
 
       const paymentRes = await fetch('/api/payments/create-razorpay-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: total,
           orderId: currentOrderId,
         }),
       });
@@ -151,13 +177,7 @@ export default function CheckoutPage() {
         throw new Error(paymentData.error || 'Failed to create payment order');
       }
 
-      setRazorpayOrderId(paymentData.id);
-
-      if (paymentData.demo) {
-        toast.info('Demo mode: Simulating successful payment');
-        await handlePaymentSuccess(currentOrderId, `demo_payment_${Date.now()}`);
-      } else {
-        const options = {
+      const options = {
           key: paymentData.key_id,
           amount: paymentData.amount,
           currency: 'INR',
@@ -165,7 +185,7 @@ export default function CheckoutPage() {
           description: 'Order Payment',
           order_id: paymentData.id,
           handler: async (response: any) => {
-            await verifyPayment(response, currentOrderId);
+            await verifyPayment(response, verifiedOrderId);
           },
           prefill: {
             name: formData.fullName,
@@ -178,9 +198,10 @@ export default function CheckoutPage() {
         };
 
         // @ts-ignore - Razorpay is loaded via script
-        const rzp = new window.Razorpay(options);
-        rzp.open();
-      }
+      if (!window.Razorpay) throw new Error('Payment service is still loading. Please try again.');
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', () => toast.error('Payment failed. Your order has not been charged.'));
+      rzp.open();
     } catch (error: any) {
       toast.error(error.message || 'Failed to create order');
     } finally {
@@ -207,13 +228,13 @@ export default function CheckoutPage() {
         throw new Error(data.error || 'Payment verification failed');
       }
 
-      await handlePaymentSuccess(currentOrderId, response.razorpay_payment_id);
+      await handlePaymentSuccess(currentOrderId);
     } catch (error: any) {
       toast.error(error.message || 'Payment verification failed');
     }
   };
 
-  const handlePaymentSuccess = async (currentOrderId: string, paymentId: string) => {
+  const handlePaymentSuccess = async (currentOrderId: string) => {
     // IMPORTANT: set this FIRST, synchronously, before refreshCart() or the
     // navigation — this is what stops the empty-cart effect from racing
     // in and redirecting to /cart instead of the order confirmation page.
@@ -390,7 +411,9 @@ export default function CheckoutPage() {
                           <Image
                             src={item.variant.image_urls[0]}
                             alt={item.variant.product?.name || 'Product'}
-                            className="w-full h-full object-cover rounded"
+                            fill
+                            sizes="64px"
+                            className="object-cover rounded"
                           />
                         )}
                       </div>

@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { createClient } from '@/lib/supabase/client';
@@ -57,11 +57,7 @@ export default function AdminCouponsPage() {
     }
   }, [user, profile, authLoading, router]);
 
-  useEffect(() => {
-    fetchCoupons();
-  }, []);
-
-  const fetchCoupons = async () => {
+  const fetchCoupons = useCallback(async () => {
     if (!user || profile?.role !== 'admin') return;
 
     const supabase = createClient();
@@ -76,7 +72,11 @@ export default function AdminCouponsPage() {
       setCoupons(data || []);
     }
     setLoading(false);
-  };
+  }, [user, profile?.role]);
+
+  useEffect(() => {
+    fetchCoupons();
+  }, [fetchCoupons]);
 
   const handleEdit = (coupon: Coupon) => {
     setEditingCoupon(coupon);

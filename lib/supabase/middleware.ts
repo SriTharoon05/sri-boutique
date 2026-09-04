@@ -42,7 +42,7 @@ export async function updateSession(request: NextRequest) {
     if (!user) {
       const url = request.nextUrl.clone();
       url.pathname = '/auth/login';
-      url.searchParams.set('redirectTo', request.nextUrl.pathname);
+      url.searchParams.set('redirectTo', `${request.nextUrl.pathname}${request.nextUrl.search}`);
       return NextResponse.redirect(url);
     }
 
@@ -65,7 +65,7 @@ export async function updateSession(request: NextRequest) {
     if (!user) {
       const url = request.nextUrl.clone();
       url.pathname = '/auth/login';
-      url.searchParams.set('redirectTo', request.nextUrl.pathname);
+      url.searchParams.set('redirectTo', `${request.nextUrl.pathname}${request.nextUrl.search}`);
       return NextResponse.redirect(url);
     }
   }
@@ -75,7 +75,7 @@ export async function updateSession(request: NextRequest) {
     if (!user) {
       const url = request.nextUrl.clone();
       url.pathname = '/auth/login';
-      url.searchParams.set('redirectTo', request.nextUrl.pathname);
+      url.searchParams.set('redirectTo', `${request.nextUrl.pathname}${request.nextUrl.search}`);
       return NextResponse.redirect(url);
     }
   }

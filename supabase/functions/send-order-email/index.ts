@@ -1,9 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
 interface EmailRequest {
@@ -31,6 +30,15 @@ function formatINR(amount: number): string {
   return `₹${amount.toLocaleString("en-IN")}`;
 }
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 function buildOrderConfirmationEmail(
   { orderNumber, total, items, shippingAddress }: Omit<EmailRequest, "to" | "subject">,
   siteUrl: string
@@ -40,7 +48,7 @@ function buildOrderConfirmationEmail(
       (item) => `
                 <tr>
                   <td style="padding:12px 12px 12px 0; border-bottom:1px solid #f0e8de; font-size:14px; color:#2b211d; vertical-align:top;">
-                    ${item.name}
+                    ${escapeHtml(item.name)}
                     <div style="font-size:12px; color:#a89b93; margin-top:2px;">Qty: ${item.quantity}</div>
                   </td>
                   <td align="right" width="90" style="padding:12px 0; border-bottom:1px solid #f0e8de; font-size:14px; color:#2b211d; white-space:nowrap; vertical-align:top;">
@@ -51,10 +59,10 @@ function buildOrderConfirmationEmail(
     .join("");
 
   const addressLine2 = shippingAddress.addressLine2
-    ? `${shippingAddress.addressLine2}<br />`
+    ? `${escapeHtml(shippingAddress.addressLine2)}<br />`
     : "";
 
-  const country = shippingAddress.country || "India";
+  const country = escapeHtml(shippingAddress.country || "India");
 
   return `<!DOCTYPE html>
 <html>
@@ -97,7 +105,7 @@ function buildOrderConfirmationEmail(
                   <td align="center" style="padding:8px 0 32px;">
                     <div style="display:inline-block; background-color:#f3e9dd; border:1px solid #e8ddd0; border-radius:8px; padding:14px 32px;">
                       <span style="font-family: 'Courier New', monospace; font-size:18px; font-weight:700; letter-spacing:2px; color:#5c2a3a;">
-                        ${orderNumber}
+                        ${escapeHtml(orderNumber)}
                       </span>
                     </div>
                   </td>
@@ -145,10 +153,10 @@ function buildOrderConfirmationEmail(
                 Shipping To
               </p>
               <p style="margin:0; font-size:14px; line-height:1.6; color:#5a4d47;">
-                ${shippingAddress.fullName}<br />
-                ${shippingAddress.addressLine1}<br />
+                ${escapeHtml(shippingAddress.fullName)}<br />
+                ${escapeHtml(shippingAddress.addressLine1)}<br />
                 ${addressLine2}
-                ${shippingAddress.city}, ${shippingAddress.state} - ${shippingAddress.pincode}<br />
+                ${escapeHtml(shippingAddress.city)}, ${escapeHtml(shippingAddress.state)} - ${escapeHtml(shippingAddress.pincode)}<br />
                 ${country}
               </p>
             </td>
@@ -205,6 +213,15 @@ Deno.serve(async (req: Request) => {
     );
   }
 
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const bearer = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+  if (!serviceRoleKey || bearer !== serviceRoleKey) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
   // BREVO_API_KEY must be set via: supabase secrets set BREVO_API_KEY=your_key
   const brevoApiKey = Deno.env.get("BREVO_API_KEY");
   const siteUrl = Deno.env.get("NEXT_PUBLIC_SITE_URL") || "https://sriboutique.com";
@@ -219,6 +236,12 @@ Deno.serve(async (req: Request) => {
   try {
     const body: EmailRequest = await req.json();
     const { to, subject, orderNumber, total, items, shippingAddress } = body;
+    if (!to || !orderNumber || !shippingAddress || !Array.isArray(items) || !Number.isFinite(Number(total))) {
+      return new Response(JSON.stringify({ error: "Invalid email payload" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const htmlContent = buildOrderConfirmationEmail(
       { orderNumber, total, items, shippingAddress },
@@ -239,7 +262,7 @@ Deno.serve(async (req: Request) => {
           email: "orders@sriboutique.com", // must be verified in Brevo's Domains section
         },
         to: [{ email: to }],
-        subject: subject || `Order Confirmed - ${orderNumber}`,
+        subject: String(subject || `Order Confirmed - ${orderNumber}`).replace(/[\r\n]/g, ' ').slice(0, 150),
         htmlContent,
       }),
     });

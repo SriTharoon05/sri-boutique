@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { createClient } from '@/lib/supabase/client';
 import { Category, Product, ProductVariant } from '@/types/database';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
@@ -37,6 +36,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 interface CategoryPageContentProps {
   category: Category;
+  initialProducts: (Product & { variants: ProductVariant[] })[];
   initialFilters: {
     sort?: string;
     color?: string;
@@ -47,108 +47,6 @@ interface CategoryPageContentProps {
   };
 }
 
-// Demo products for when database is empty
-const demoProducts: (Product & { variants: ProductVariant[] })[] = [
-  {
-    id: '1',
-    name: 'Royal Banarasi Silk Saree',
-    slug: 'royal-banarasi-silk-saree',
-    description: 'Handwoven Banarasi silk saree with intricate gold zari work.',
-    base_price: 25999,
-    category_id: '1',
-    is_active: true,
-    avg_rating: 4.8,
-    review_count: 124,
-    created_at: new Date().toISOString(),
-    variants: [{
-      id: '1',
-      product_id: '1',
-      sku: 'RBS-001',
-      color: 'Maroon',
-      size: 'Free Size',
-      stock_quantity: 10,
-      image_urls: ['https://images.pexels.com/photos/1078983/pexels-photo-1078983.jpeg'],
-      is_active: true,
-      created_at: new Date().toISOString(),
-      price_override: null,
-    }],
-  },
-  {
-    id: '2',
-    name: 'Contemporary Block Print Saree',
-    slug: 'contemporary-block-print-saree',
-    description: 'Modern design with traditional block print.',
-    base_price: 8999,
-    category_id: '1',
-    is_active: true,
-    avg_rating: 4.6,
-    review_count: 89,
-    created_at: new Date().toISOString(),
-    variants: [{
-      id: '2',
-      product_id: '2',
-      sku: 'CPS001',
-      color: 'Navy Blue',
-      size: 'Free Size',
-      stock_quantity: 15,
-      image_urls: ['https://images.pexels.com/photos/1647920/pexels-photo-1647920.jpeg'],
-      is_active: true,
-      created_at: new Date().toISOString(),
-      price_override: null,
-    }],
-  },
-  {
-    id: '3',
-    name: 'Chanderi Cotton Saree',
-    slug: 'chanderi-cotton-saree',
-    description: 'Lightweight Chanderi cotton saree with subtle embroidery.',
-    base_price: 7499,
-    category_id: '1',
-    is_active: true,
-    avg_rating: 4.5,
-    review_count: 67,
-    created_at: new Date().toISOString(),
-    variants: [{
-      id: '3',
-      product_id: '3',
-      sku: 'CCS001',
-      color: 'Peach',
-      size: 'Free Size',
-      stock_quantity: 8,
-      image_urls: ['https://images.pexels.com/photos/322207/pexels-photo-322207.jpeg'],
-      is_active: true,
-      created_at: new Date().toISOString(),
-      price_override: null,
-    }],
-  },
-  {
-    id: '4',
-    name: 'Pure Kanjeevaram Saree',
-    slug: 'pure-kanjeevaram-saree',
-    description: 'Traditional Kanjeevaram silk with temple borders.',
-    base_price: 35999,
-    category_id: '1',
-    is_active: true,
-    avg_rating: 4.9,
-    review_count: 156,
-    created_at: new Date().toISOString(),
-    variants: [{
-      id: '4',
-      product_id: '4',
-      sku: 'PKS001',
-      color: 'Royal Blue',
-      size: 'Free Size',
-      stock_quantity: 5,
-      image_urls: ['https://images.pexels.com/photos/769770/pexels-photo-769770.jpeg'],
-      is_active: true,
-      created_at: new Date().toISOString(),
-      price_override: null,
-    }],
-  },
-];
-
-const colors = ['Maroon', 'Navy Blue', 'Peach', 'Royal Blue', 'Gold', 'Green', 'Black', 'Pink'];
-const sizes = ['Free Size', 'S', 'M', 'L', 'XL'];
 const priceRanges = [
   { label: 'Under ₹5,000', min: 0, max: 5000 },
   { label: '₹5,000 - ₹10,000', min: 5000, max: 10000 },
@@ -157,49 +55,24 @@ const priceRanges = [
   { label: 'Above ₹30,000', min: 30000, max: 999999 },
 ];
 
-export function CategoryPageContent({ category, initialFilters }: CategoryPageContentProps) {
-  const [products, setProducts] = useState<(Product & { variants: ProductVariant[] })[]>(demoProducts);
-  const [loading, setLoading] = useState(true);
-  const [selectedColors, setSelectedColors] = useState<string[]>([]);
-  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
-  const [priceRange, setPriceRange] = useState<{ min: number; max: number } | null>(null);
+export function CategoryPageContent({ category, initialProducts, initialFilters }: CategoryPageContentProps) {
+  const products = initialProducts;
+  const loading = false;
+  const [selectedColors, setSelectedColors] = useState<string[]>(initialFilters.color?.split(',').filter(Boolean) || []);
+  const [selectedSizes, setSelectedSizes] = useState<string[]>(initialFilters.size?.split(',').filter(Boolean) || []);
+  const [priceRange, setPriceRange] = useState<{ min: number; max: number } | null>(
+    initialFilters.min && initialFilters.max
+      ? { min: Number(initialFilters.min), max: Number(initialFilters.max) }
+      : null,
+  );
   const [sortBy, setSortBy] = useState(initialFilters.sort || 'newest');
   const [currentPage, setCurrentPage] = useState(1);
 
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-
-  useEffect(() => {
-    async function fetchProducts() {
-      const supabase = createClient();
-
-      // First get category ID from slug
-      const { data: categoryData } = await supabase
-        .from('categories')
-        .select('id')
-        .eq('slug', category.slug)
-        .maybeSingle();
-
-      if (categoryData) {
-        const { data, error } = await supabase
-          .from('products')
-          .select(`
-            *,
-            variants:product_variants (*)
-          `)
-          .eq('category_id', categoryData.id)
-          .eq('is_active', true);
-
-        if (data && data.length > 0) {
-          setProducts(data as (Product & { variants: ProductVariant[] })[]);
-        }
-      }
-      setLoading(false);
-    }
-
-    fetchProducts();
-  }, [category.slug]);
+  const colors = Array.from(new Set(products.flatMap((product) => product.variants.map((variant) => variant.color).filter(Boolean)))) as string[];
+  const sizes = Array.from(new Set(products.flatMap((product) => product.variants.map((variant) => variant.size).filter(Boolean)))) as string[];
 
   const updateFilters = () => {
     const params = new URLSearchParams(searchParams.toString());
@@ -216,14 +89,14 @@ export function CategoryPageContent({ category, initialFilters }: CategoryPageCo
   };
 
   const filteredProducts = products.filter(product => {
-    const variant = product.variants?.[0];
-    const price = variant?.price_override ?? product.base_price;
+    const prices = product.variants?.map((variant) => variant.price_override ?? product.base_price) || [product.base_price];
+    const price = Math.min(...prices);
 
-    if (selectedColors.length > 0 && variant?.color && !selectedColors.includes(variant.color)) {
+    if (selectedColors.length > 0 && !product.variants.some((variant) => variant.color && selectedColors.includes(variant.color))) {
       return false;
     }
 
-    if (selectedSizes.length > 0 && variant?.size && !selectedSizes.includes(variant.size)) {
+    if (selectedSizes.length > 0 && !product.variants.some((variant) => variant.size && selectedSizes.includes(variant.size))) {
       return false;
     }
 

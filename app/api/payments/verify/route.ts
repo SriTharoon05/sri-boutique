@@ -40,7 +40,9 @@ export async function POST(request: NextRequest) {
       .update(body)
       .digest('hex');
 
-    if (expectedSignature !== razorpay_signature) {
+    const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+    const receivedBuffer = Buffer.from(String(razorpay_signature), 'hex');
+    if (receivedBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, receivedBuffer)) {
       console.error('Signature mismatch for order:', orderId);
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
     }
@@ -50,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     const { data: existingOrder, error: fetchError } = await adminSupabase
       .from('orders')
-      .select('id, user_id, status, email_sent')
+      .select('id, user_id, status, email_sent, razorpay_order_id')
       .eq('id', orderId)
       .single();
 
@@ -60,6 +62,10 @@ export async function POST(request: NextRequest) {
 
     if (existingOrder.user_id !== user.id) {
       return NextResponse.json({ error: 'Order does not belong to this user' }, { status: 403 });
+    }
+
+    if (!existingOrder.razorpay_order_id || existingOrder.razorpay_order_id !== razorpay_order_id) {
+      return NextResponse.json({ error: 'Payment does not match this order' }, { status: 400 });
     }
 
     // 5. Mark the order paid if it isn't already. This may have already
@@ -81,6 +87,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
       }
     }
+
+    const { data: userCart } = await adminSupabase
+      .from('carts')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (userCart) await adminSupabase.from('cart_items').delete().eq('cart_id', userCart.id);
 
     // 6. Claim the right to send the confirmation email.
     //    This is an ATOMIC conditional update: it only succeeds (and only
@@ -120,13 +133,13 @@ export async function POST(request: NextRequest) {
     if (wonEmailClaim && order && process.env.NEXT_PUBLIC_SUPABASE_URL) {
       try {
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
         const emailRes = await fetch(`${supabaseUrl}/functions/v1/send-order-email`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${supabaseAnonKey}`,
+            Authorization: `Bearer ${serviceRoleKey}`,
           },
           body: JSON.stringify({
             to: user.email,

@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { MainLayout } from '@/components/layout/main-layout';
+import { STORE_ADDRESS } from '@/lib/site';
 import { Card } from '@/components/ui/card';
 import { Mail, MapPin, Instagram, Clock } from 'lucide-react';
 
@@ -59,7 +60,7 @@ export default function ContactPage() {
             <div>
               <h3 className="font-medium mb-1">Location</h3>
               <p className="text-sm text-muted-foreground">
-                Chennai, Tamil Nadu, India
+                {STORE_ADDRESS}
               </p>
             </div>
           </Card>

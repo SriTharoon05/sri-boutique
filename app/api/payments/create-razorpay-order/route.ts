@@ -1,25 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin-client';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(request: NextRequest) {
   try {
-    const { amount, orderId } = await request.json();
+    const { orderId } = await request.json();
 
-    if (!amount || !orderId) {
-      return NextResponse.json({ error: 'Missing amount or orderId' }, { status: 400 });
+    if (!orderId || !UUID_REGEX.test(orderId)) {
+      return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
+    }
+
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const adminSupabase = createAdminClient();
+    const { data: order } = await adminSupabase
+      .from('orders')
+      .select('id, user_id, total, status, payment_status, razorpay_order_id')
+      .eq('id', orderId)
+      .maybeSingle();
+
+    if (!order || order.user_id !== user.id) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+    if (order.status !== 'pending' || order.payment_status === 'success') {
+      return NextResponse.json({ error: 'This order cannot be paid again' }, { status: 409 });
     }
 
     const key_id = process.env.RAZORPAY_KEY_ID;
     const key_secret = process.env.RAZORPAY_KEY_SECRET;
 
     if (!key_id || !key_secret) {
-      // Return demo response if keys not configured
-      return NextResponse.json({
-        id: `order_demo_${Date.now()}`,
-        amount: Math.round(amount * 100),
-        currency: 'INR',
-        key_id: 'rzp_test_demo',
-        demo: true,
-      });
+      return NextResponse.json({ error: 'Payment service is not configured' }, { status: 503 });
+    }
+
+    const amountInPaise = Math.round(Number(order.total) * 100);
+    if (!Number.isSafeInteger(amountInPaise) || amountInPaise < 100) {
+      return NextResponse.json({ error: 'Invalid order total' }, { status: 400 });
+    }
+
+    if (order.razorpay_order_id) {
+      return NextResponse.json({ id: order.razorpay_order_id, amount: amountInPaise, currency: 'INR', key_id });
     }
 
     const response = await fetch('https://api.razorpay.com/v1/orders', {
@@ -29,7 +53,7 @@ export async function POST(request: NextRequest) {
         Authorization: `Basic ${Buffer.from(`${key_id}:${key_secret}`).toString('base64')}`,
       },
       body: JSON.stringify({
-        amount: Math.round(amount * 100), // Convert to paise
+        amount: amountInPaise,
         currency: 'INR',
         receipt: orderId,
         payment_capture: 1,
@@ -46,6 +70,31 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await response.json();
+
+    const { data: boundOrder, error: bindError } = await adminSupabase
+      .from('orders')
+      .update({ razorpay_order_id: data.id, updated_at: new Date().toISOString() })
+      .eq('id', orderId)
+      .is('razorpay_order_id', null)
+      .select('razorpay_order_id')
+      .maybeSingle();
+
+    if (bindError) {
+      console.error('Could not bind Razorpay order:', bindError);
+      return NextResponse.json({ error: 'Failed to initialise payment' }, { status: 500 });
+    }
+
+    if (!boundOrder) {
+      const { data: concurrentlyBoundOrder } = await adminSupabase
+        .from('orders')
+        .select('razorpay_order_id')
+        .eq('id', orderId)
+        .single();
+      if (concurrentlyBoundOrder?.razorpay_order_id) {
+        return NextResponse.json({ id: concurrentlyBoundOrder.razorpay_order_id, amount: amountInPaise, currency: 'INR', key_id });
+      }
+      return NextResponse.json({ error: 'Failed to initialise payment' }, { status: 500 });
+    }
 
     return NextResponse.json({
       id: data.id,

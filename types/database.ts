@@ -241,7 +241,10 @@ export interface Database {
           shipping_address: Json;
           phone: string;
           payment_id: string | null;
+          razorpay_order_id: string | null;
           payment_status: 'pending' | 'success' | 'failed';
+          email_sent: boolean;
+          email_sent_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -258,7 +261,10 @@ export interface Database {
           shipping_address: Json;
           phone: string;
           payment_id?: string | null;
+          razorpay_order_id?: string | null;
           payment_status?: 'pending' | 'success' | 'failed';
+          email_sent?: boolean;
+          email_sent_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -275,7 +281,10 @@ export interface Database {
           shipping_address?: Json;
           phone?: string;
           payment_id?: string | null;
+          razorpay_order_id?: string | null;
           payment_status?: 'pending' | 'success' | 'failed';
+          email_sent?: boolean;
+          email_sent_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

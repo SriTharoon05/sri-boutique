@@ -3,14 +3,14 @@ import { createClient } from "npm:@supabase/supabase-js@2.58.0";
 import crypto from "node:crypto";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Origin": "https://api.razorpay.com",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, X-Razorpay-Signature",
 };
 
 async function sendOrderEmail(
   supabaseUrl: string,
-  anonKey: string,
+  serviceRoleKey: string,
   order: any,
   toEmail: string
 ) {
@@ -18,7 +18,7 @@ async function sendOrderEmail(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${anonKey}`,
+      Authorization: `Bearer ${serviceRoleKey}`,
     },
     body: JSON.stringify({
       to: toEmail,
@@ -71,7 +71,14 @@ Deno.serve(async (req: Request) => {
       .update(body)
       .digest("hex");
 
-    if (signature !== expectedSignature) {
+    const signaturesMatch = Boolean(signature)
+      && signature!.length === expectedSignature.length
+      && crypto.timingSafeEqual(
+        new TextEncoder().encode(signature!),
+        new TextEncoder().encode(expectedSignature),
+      );
+
+    if (!signaturesMatch) {
       console.error("Invalid webhook signature");
       return new Response(
         JSON.stringify({ error: "Invalid signature" }),
@@ -82,7 +89,6 @@ Deno.serve(async (req: Request) => {
     const event = JSON.parse(body);
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -103,7 +109,7 @@ Deno.serve(async (req: Request) => {
       // already did this first.
       const { data: existingOrder, error: fetchError } = await supabase
         .from("orders")
-        .select("id, status, user_id")
+        .select("id, status, user_id, total, razorpay_order_id")
         .eq("id", orderId)
         .maybeSingle();
 
@@ -112,6 +118,16 @@ Deno.serve(async (req: Request) => {
         return new Response(
           JSON.stringify({ error: "Order not found" }),
           { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (!existingOrder.razorpay_order_id
+        || payment.order_id !== existingOrder.razorpay_order_id
+        || Number(payment.amount) !== Math.round(Number(existingOrder.total) * 100)) {
+        console.error("Payment/order binding check failed", orderId);
+        return new Response(
+          JSON.stringify({ error: "Payment does not match order" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
@@ -130,6 +146,14 @@ Deno.serve(async (req: Request) => {
           console.error("Error updating order:", updateError);
         }
       }
+
+
+      const { data: userCart } = await supabase
+        .from("carts")
+        .select("id")
+        .eq("user_id", existingOrder.user_id)
+        .maybeSingle();
+      if (userCart) await supabase.from("cart_items").delete().eq("cart_id", userCart.id);
 
       // Claim the right to send the confirmation email. This atomic
       // conditional update only affects a row (and only returns one) if
@@ -171,7 +195,7 @@ Deno.serve(async (req: Request) => {
           );
         } else {
           try {
-            await sendOrderEmail(supabaseUrl, supabaseAnonKey, fullOrder, userData.user.email);
+            await sendOrderEmail(supabaseUrl, supabaseServiceKey, fullOrder, userData.user.email);
             console.log(`Order confirmation email sent for order ${orderId}`);
           } catch (emailErr) {
             console.error("Failed to send order email from webhook:", emailErr);
@@ -200,7 +224,8 @@ Deno.serve(async (req: Request) => {
             payment_id: payment.id,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", payment.notes.order_id);
+          .eq("id", payment.notes.order_id)
+          .eq("razorpay_order_id", payment.order_id);
       }
     }
 
