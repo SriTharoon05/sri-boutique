@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Star, Minus, Plus, Heart, Share2, Truck, RefreshCw, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { getDisplayProductGallery, getDisplayProductImage } from '@/lib/mock-images';
 
 interface ProductPageContentProps {
   product: Product & { category: Category | null; variants: ProductVariant[] };
@@ -37,9 +38,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
   const [inWishlist, setInWishlist] = useState(false);
 
   const variantImages = selectedVariant?.image_urls || [];
-  const images = variantImages.length > 0
-    ? variantImages
-    : ['/images/sarees/kanchipuram-maroon.png'];
+  const images = getDisplayProductGallery(product.slug, variantImages);
 
   const currentPrice = selectedVariant?.price_override ?? product.base_price;
   const colors = Array.from(new Set(variants.map(v => v.color).filter(Boolean))) as string[];
@@ -484,24 +483,22 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
               You May Also Like
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-              {relatedProducts.map((related) => {
+              {relatedProducts.map((related, index) => {
                 const variant = related.variants?.[0];
                 const price = variant?.price_override ?? related.base_price;
-                const image = variant?.image_urls?.[0];
+                const image = getDisplayProductImage(related.slug, variant?.image_urls?.[0], index);
 
                 return (
                   <Link key={related.id} href={`/product/${related.slug}`}>
                     <div className="group">
                       <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-muted">
-                        {image && (
-                          <Image
+                        <Image
                             src={image}
                             alt={related.name}
                             fill
                             sizes="(max-width: 768px) 50vw, 25vw"
                             className="object-cover transition-transform duration-500 group-hover:scale-105"
                           />
-                        )}
                       </div>
                       <div className="mt-4">
                         <h3 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors">

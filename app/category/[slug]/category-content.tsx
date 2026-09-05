@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/accordion';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { getDisplayProductImage } from '@/lib/mock-images';
 
 interface CategoryPageContentProps {
   category: Category;
@@ -348,7 +349,7 @@ export function CategoryPageContent({ category, initialProducts, initialFilters 
                   {filteredProducts.map((product, index) => {
                     const variant = product.variants?.[0];
                     const price = variant?.price_override ?? product.base_price;
-                    const image = variant?.image_urls?.[0];
+                    const image = getDisplayProductImage(product.slug, variant?.image_urls?.[0], index);
 
                     return (
                       <motion.div
@@ -360,17 +361,13 @@ export function CategoryPageContent({ category, initialProducts, initialFilters 
                         <Link href={`/product/${product.slug}`}>
                           <Card className="group overflow-hidden border-0 shadow-none bg-transparent">
                             <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-muted">
-                              {image ? (
-                                <Image
+                              <Image
                                   src={image}
                                   alt={product.name}
                                   fill
                                   sizes="(max-width: 768px) 50vw, 33vw"
                                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                                 />
-                              ) : (
-                                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-accent/10" />
-                              )}
 
                               {product.avg_rating > 0 && (
                                 <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium">

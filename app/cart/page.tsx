@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Trash2, Minus, Plus, ShoppingBag, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getDisplayProductImage } from '@/lib/mock-images';
 
 export default function CartPage() {
   const { items, itemCount, subtotal, loading, updateQuantity, removeItem, clearCart } = useCart();
@@ -126,19 +127,13 @@ export default function CartPage() {
                             href={`/product/${item.variant.product?.slug}`}
                             className="w-24 h-32 md:w-32 md:h-40 flex-shrink-0 relative rounded-md overflow-hidden bg-muted"
                           >
-                            {item.variant.image_urls?.[0] ? (
-                              <Image
-                                src={item.variant.image_urls[0]}
+                            <Image
+                                src={getDisplayProductImage(item.variant.product?.slug || item.variant_id, item.variant.image_urls?.[0])}
                                 alt={item.variant.product?.name || 'Product'}
                                 fill
                                 sizes="128px"
                                 className="object-cover"
                               />
-                            ) : (
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <ShoppingBag className="h-8 w-8 text-muted-foreground/30" />
-                              </div>
-                            )}
                           </Link>
 
                           <div className="flex-1 min-w-0">

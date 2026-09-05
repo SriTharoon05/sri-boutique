@@ -4,6 +4,7 @@ import { createPublicClient } from '@/lib/supabase/public';
 import { ProductPageContent } from './product-content';
 import { findDemoProduct } from '@/lib/demo-catalog';
 import { absoluteUrl } from '@/lib/site';
+import { getDisplayProductGallery, getDisplayProductImage } from '@/lib/mock-images';
 
 // Force fresh data on every request — without this, Next.js may cache
 // this page's Supabase query results, so stock/price changes in the DB
@@ -43,7 +44,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       description: resolvedProduct.description || `Shop ${resolvedProduct.name} at Sri Boutique.`,
       type: 'website',
       url: absoluteUrl(`/product/${resolvedProduct.slug}`),
-      images: resolvedProduct.variants?.[0]?.image_urls?.[0] ? [{ url: resolvedProduct.variants[0].image_urls[0] }] : [],
+      images: [{ url: getDisplayProductImage(resolvedProduct.slug, resolvedProduct.variants?.[0]?.image_urls?.[0]) }],
     },
   };
 }
@@ -58,7 +59,7 @@ function generateStructuredData(product: any) {
     '@type': 'Product',
     name: product.name,
     description: product.description,
-    image: variant?.image_urls || [],
+    image: getDisplayProductGallery(product.slug, variant?.image_urls || []),
     offers: {
       '@type': 'Offer',
       price: price,

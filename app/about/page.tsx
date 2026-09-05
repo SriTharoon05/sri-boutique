@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
+import { mockImages } from '@/lib/mock-images';
 
 export const metadata: Metadata = {
   title: 'Our Story | Sri Boutique',
@@ -33,7 +34,7 @@ export default function AboutPage() {
         <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-center mb-20">
           <div className="relative aspect-square rounded-lg overflow-hidden">
             <Image
-              src="/images/sarees/kanchipuram-maroon.png"
+              src={mockImages.heritage}
               alt="Traditional handloom weaving"
               fill
               sizes="(max-width: 768px) 100vw, 50vw"

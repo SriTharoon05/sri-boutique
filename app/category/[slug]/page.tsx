@@ -5,6 +5,7 @@ import { CategoryPageContent } from './category-content';
 import { demoProducts, findDemoCategory } from '@/lib/demo-catalog';
 import type { Product, ProductVariant } from '@/types/database';
 import { absoluteUrl } from '@/lib/site';
+import { getDisplayCategoryImage } from '@/lib/mock-images';
 
 export const revalidate = 300;
 
@@ -36,7 +37,7 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
       title: `${resolvedCategory.name} | Sri Boutique`,
       description: resolvedCategory.description || `Shop our collection of ${resolvedCategory.name.toLowerCase()} at Sri Boutique.`,
       url: absoluteUrl(`/category/${resolvedCategory.slug}`),
-      images: resolvedCategory.image_url ? [{ url: resolvedCategory.image_url }] : [],
+      images: [{ url: getDisplayCategoryImage(resolvedCategory.slug, resolvedCategory.image_url) }],
     },
   };
 }

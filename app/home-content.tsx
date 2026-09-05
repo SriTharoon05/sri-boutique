@@ -12,6 +12,7 @@ import type { CatalogProduct } from '@/lib/demo-catalog';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { getDisplayCategoryImage, getDisplayProductImage, mockImages } from '@/lib/mock-images';
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -62,8 +63,8 @@ export function HomePageContent({ categories, products }: HomePageContentProps) 
       <section className="relative h-[85vh] min-h-[600px] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/10" />
         <Image
-          src="/images/sarees/banarasi-peacock.png"
-          alt=""
+          src={mockImages.hero}
+          alt="Saree mannequins displayed in a boutique window"
           fill
           priority
           sizes="100vw"
@@ -181,17 +182,13 @@ export function HomePageContent({ categories, products }: HomePageContentProps) 
                 <Link href={`/category/${category.slug}`}>
                   <Card className="group overflow-hidden border-0 shadow-none">
                     <div className="relative aspect-[3/4] overflow-hidden rounded-lg">
-                      {category.image_url ? (
-                        <Image
-                          src={category.image_url}
+                      <Image
+                          src={getDisplayCategoryImage(category.slug, category.image_url, index)}
                           alt={category.name}
                           fill
                           sizes="(max-width: 768px) 50vw, 25vw"
                           className="object-cover transition-transform duration-500 group-hover:scale-105"
                         />
-                      ) : (
-                        <div className="absolute inset-0 bg-muted" />
-                      )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
                       <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
                         <h3 className="font-display text-xl md:text-2xl font-medium text-white mb-1">
@@ -238,7 +235,7 @@ export function HomePageContent({ categories, products }: HomePageContentProps) 
             {products.map((product, index) => {
               const variant = product.variants?.[0];
               const price = variant?.price_override ?? product.base_price;
-              const image = variant?.image_urls?.[0];
+              const image = getDisplayProductImage(product.slug, variant?.image_urls?.[0], index);
 
               return (
                 <motion.div
@@ -251,17 +248,13 @@ export function HomePageContent({ categories, products }: HomePageContentProps) 
                   <Link href={`/product/${product.slug}`}>
                     <Card className="group overflow-hidden border-0 shadow-none bg-background">
                       <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-muted">
-                        {image ? (
-                          <Image
+                        <Image
                             src={image}
                             alt={product.name}
                             fill
                             sizes="(max-width: 768px) 50vw, 25vw"
                             className="object-cover transition-transform duration-500 group-hover:scale-105"
                           />
-                        ) : (
-                          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-accent/10" />
-                        )}
 
                         {/* Quick view overlay */}
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -309,9 +302,9 @@ export function HomePageContent({ categories, products }: HomePageContentProps) 
               viewport={{ once: true }}
               className="relative"
             >
-              <div className="aspect-square rounded-lg overflow-hidden">
+              <div className="relative aspect-square rounded-lg overflow-hidden">
                 <Image
-                  src="/images/sarees/handloom-mustard.png"
+                  src={mockImages.heritage}
                   alt="Traditional handloom weaving"
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"

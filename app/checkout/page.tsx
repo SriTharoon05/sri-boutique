@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, CreditCard, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
+import { getDisplayProductImage } from '@/lib/mock-images';
 
 interface FormData {
   fullName: string;
@@ -407,15 +408,13 @@ export default function CheckoutPage() {
                   return (
                     <div key={item.id} className="flex gap-4">
                       <div className="w-16 h-20 bg-muted rounded flex-shrink-0 relative">
-                        {item.variant.image_urls?.[0] && (
-                          <Image
-                            src={item.variant.image_urls[0]}
+                        <Image
+                            src={getDisplayProductImage(item.variant.product?.slug || item.variant_id, item.variant.image_urls?.[0])}
                             alt={item.variant.product?.name || 'Product'}
                             fill
                             sizes="64px"
                             className="object-cover rounded"
                           />
-                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm line-clamp-1">

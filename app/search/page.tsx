@@ -5,6 +5,7 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { Card } from '@/components/ui/card';
 import { createPublicClient } from '@/lib/supabase/public';
 import { demoProducts, type CatalogProduct } from '@/lib/demo-catalog';
+import { getDisplayProductImage } from '@/lib/mock-images';
 
 export const metadata: Metadata = {
   title: 'Search',
@@ -48,15 +49,15 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           <div className="py-20 text-center text-muted-foreground">No matching products found.</div>
         ) : (
           <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 md:gap-6">
-            {products.map((product) => {
+            {products.map((product, index) => {
               const variant = product.variants?.[0];
-              const image = variant?.image_urls?.[0];
+              const image = getDisplayProductImage(product.slug, variant?.image_urls?.[0], index);
               const price = variant?.price_override ?? product.base_price;
               return (
                 <Link key={product.id} href={`/product/${product.slug}`}>
                   <Card className="group border-0 shadow-none">
                     <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-muted">
-                      {image && <Image src={image} alt={product.name} fill sizes="(max-width: 768px) 50vw, 25vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />}
+                      <Image src={image} alt={product.name} fill sizes="(max-width: 768px) 50vw, 25vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />
                     </div>
                     <h2 className="mt-3 line-clamp-2 font-medium group-hover:text-primary">{product.name}</h2>
                     <p className="mt-1 font-display text-lg font-semibold">₹{Number(price).toLocaleString('en-IN')}</p>

@@ -1,4 +1,5 @@
 import type { Category, Product, ProductVariant } from '@/types/database';
+import { mockImages } from '@/lib/mock-images';
 
 export type CatalogProduct = Product & {
   category: Category | null;
@@ -14,7 +15,7 @@ export const demoCategories: Category[] = [
     slug: 'silk-sarees',
     description: 'Kanchipuram and Banarasi silks selected for weddings, celebrations, and heirloom wardrobes.',
     parent_id: null,
-    image_url: '/images/sarees/kanchipuram-maroon.png',
+    image_url: mockImages.categories['silk-sarees'],
     created_at: createdAt,
   },
   {
@@ -23,7 +24,7 @@ export const demoCategories: Category[] = [
     slug: 'cotton-sarees',
     description: 'Breathable handloom cotton sarees for effortless everyday elegance.',
     parent_id: null,
-    image_url: '/images/sarees/handloom-mustard.png',
+    image_url: mockImages.categories['cotton-sarees'],
     created_at: createdAt,
   },
   {
@@ -32,7 +33,16 @@ export const demoCategories: Category[] = [
     slug: 'designer-sarees',
     description: 'Statement drapes that pair traditional weaving with a modern point of view.',
     parent_id: null,
-    image_url: '/images/sarees/banarasi-peacock.png',
+    image_url: mockImages.products[5],
+    created_at: createdAt,
+  },
+  {
+    id: 'demo-category-lehenga',
+    name: 'Lehengas',
+    slug: 'lehengas',
+    description: 'Celebration-ready lehengas with graceful silhouettes and detailed finishes.',
+    parent_id: null,
+    image_url: mockImages.categories.lehengas,
     created_at: createdAt,
   },
 ];
@@ -81,7 +91,7 @@ export const demoProducts: CatalogProduct[] = [
     18999,
     demoCategories[0],
     'Maroon',
-    '/images/sarees/kanchipuram-maroon.png',
+    mockImages.products[0],
   ),
   makeProduct(
     'demo-banarasi-peacock',
@@ -91,7 +101,7 @@ export const demoProducts: CatalogProduct[] = [
     15999,
     demoCategories[0],
     'Peacock Blue',
-    '/images/sarees/banarasi-peacock.png',
+    mockImages.products[1],
   ),
   makeProduct(
     'demo-handloom-mustard',
@@ -101,7 +111,37 @@ export const demoProducts: CatalogProduct[] = [
     3999,
     demoCategories[1],
     'Mustard',
-    '/images/sarees/handloom-mustard.png',
+    mockImages.products[2],
+  ),
+  makeProduct(
+    'demo-royal-blue-silk',
+    'Royal Blue Mysore Silk Saree',
+    'royal-blue-mysore-silk-saree',
+    'A fluid royal-blue silk saree with a refined gold border, styled for receptions and evening celebrations.',
+    8999,
+    demoCategories[0],
+    'Royal Blue',
+    mockImages.products[3],
+  ),
+  makeProduct(
+    'demo-red-bridal-silk',
+    'Bridal Red Zari Silk Saree',
+    'bridal-red-zari-silk-saree',
+    'A statement bridal-red silk saree with traditional zari detailing and a richly finished pallu.',
+    21999,
+    demoCategories[0],
+    'Bridal Red',
+    mockImages.products[4],
+  ),
+  makeProduct(
+    'demo-pastel-designer',
+    'Pastel Rose Designer Saree',
+    'pastel-rose-designer-saree',
+    'A contemporary pastel-rose drape with delicate detailing for daytime celebrations and modern occasions.',
+    7499,
+    demoCategories[2],
+    'Pastel Rose',
+    mockImages.products[5],
   ),
 ];
 
