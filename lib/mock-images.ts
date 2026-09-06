@@ -2,12 +2,12 @@
  * Temporary, verified Pexels/Unsplash imagery for client demos.
  * The set intentionally contains no real people: only mannequins and textiles.
  * Replace product image URLs through the admin area as real inventory arrives.
- * Hero source: https://unsplash.com/photos/NLxe33-GgVU
+ * Hero source: https://www.pexels.com/photo/37806869/
  * Featured mannequin source: https://www.pexels.com/photo/35027434/
  * Textile source: https://unsplash.com/photos/0taSQwyJa00
  */
 export const mockImages = {
-  hero: 'https://images.unsplash.com/photo-1761549924624-6a00e5dfabb7?auto=format&fit=crop&w=2200&h=1100&q=80',
+  hero: 'https://images.pexels.com/photos/37806869/pexels-photo-37806869.jpeg?auto=compress&cs=tinysrgb&w=1600&h=1800&fit=crop',
   heritage: 'https://images.pexels.com/photos/4219611/pexels-photo-4219611.jpeg?auto=compress&cs=tinysrgb&w=2200&h=1100&fit=crop',
   products: [
     'https://images.pexels.com/photos/37806869/pexels-photo-37806869.jpeg?auto=compress&cs=tinysrgb&w=1200&h=1600&fit=crop',

@@ -42,7 +42,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-foreground/30 bg-background/95 backdrop-blur-md">
-      <div className="overflow-hidden border-b border-foreground/20 bg-secondary text-secondary-foreground">
+      <div className="hidden md:block overflow-hidden border-b border-border bg-secondary/35 text-secondary-foreground">
         <div className="marquee-track flex h-7 items-center whitespace-nowrap text-[10px] font-black uppercase tracking-[0.18em] sm:text-xs">
           {[0, 1].map((copy) => <div key={copy} className="flex items-center">{['Fresh drops, zero basic', 'Secure payments', 'Easy support', 'Made to be noticed'].map((text) => <span key={`${copy}-${text}`} className="flex items-center"><span className="mx-4">{text}</span><span aria-hidden="true">✦</span></span>)}</div>)}
         </div>
@@ -82,9 +82,9 @@ export function Header() {
         </div>
       </div>
 
-      <div className="hidden border-t-2 border-foreground md:block"><nav className="container mx-auto flex h-10 items-center justify-center gap-8 overflow-hidden px-4 text-xs font-bold uppercase tracking-[0.1em]"><Link href="/#new-drops" className="text-accent">New drops</Link>{desktopLinks.map((link) => <Link key={link.href} href={link.href} className="transition-colors hover:text-accent">{link.label}</Link>)}{overflowLinks.length > 0 && <DropdownMenu><DropdownMenuTrigger className="flex items-center gap-1">More <ChevronDown className="h-3 w-3" /></DropdownMenuTrigger><DropdownMenuContent>{overflowLinks.map((link) => <DropdownMenuItem key={link.href} asChild><Link href={link.href}>{link.label}</Link></DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>}</nav></div>
+      <div className="hidden border-t border-border md:block"><nav className="container mx-auto flex h-10 items-center justify-center gap-8 overflow-hidden px-4 text-xs font-bold uppercase tracking-[0.1em]"><Link href="/#new-drops" className="text-primary">New drops</Link>{desktopLinks.map((link) => <Link key={link.href} href={link.href} className="transition-colors hover:text-primary">{link.label}</Link>)}{overflowLinks.length > 0 && <DropdownMenu><DropdownMenuTrigger className="flex items-center gap-1">More <ChevronDown className="h-3 w-3" /></DropdownMenuTrigger><DropdownMenuContent>{overflowLinks.map((link) => <DropdownMenuItem key={link.href} asChild><Link href={link.href}>{link.label}</Link></DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>}</nav></div>
 
-      <AnimatePresence>{mobileMenuOpen && <motion.nav initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden border-t-2 border-foreground bg-foreground text-background md:hidden"><div className="grid px-4 py-5">{navLinks.map((link, index) => <Link key={link.href} href={link.href} onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-between border-b border-background/25 py-3 text-lg font-black uppercase"><span>{link.label}</span><span className="text-xs text-secondary">0{index + 1}</span></Link>)}{!user && <Link href="/auth/login" onClick={() => setMobileMenuOpen(false)} className="mt-4 text-sm font-bold uppercase text-secondary">Sign in →</Link>}</div></motion.nav>}</AnimatePresence>
+      <AnimatePresence>{mobileMenuOpen && <motion.nav initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden border-t border-border bg-primary text-primary-foreground md:hidden"><div className="grid px-4 py-5">{navLinks.map((link, index) => <Link key={link.href} href={link.href} onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-between border-b border-background/25 py-3 text-lg font-black uppercase"><span>{link.label}</span><span className="text-xs text-secondary">0{index + 1}</span></Link>)}{!user && <Link href="/auth/login" onClick={() => setMobileMenuOpen(false)} className="mt-4 text-sm font-bold uppercase text-secondary">Sign in →</Link>}</div></motion.nav>}</AnimatePresence>
     </header>
   );
 }
