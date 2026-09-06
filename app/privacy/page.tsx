@@ -1,10 +1,8 @@
 import { Metadata } from 'next';
 import { MainLayout } from '@/components/layout/main-layout';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Privacy Policy | Sri Boutique',
-  description: 'How Sri Boutique collects, uses, and protects your personal information.',
-};
+export const metadata: Metadata = buildPageMetadata('Privacy Policy', 'How Sri Boutique collects, uses, and protects your personal information.', '/privacy');
 
 export default function PrivacyPolicyPage() {
   return (

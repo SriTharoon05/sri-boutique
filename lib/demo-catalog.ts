@@ -7,42 +7,47 @@ export type CatalogProduct = Product & {
 };
 
 const createdAt = '2026-07-04T00:00:00.000Z';
+const demoCategorySource = { supplier_id: null, supplier_category_id: null, synced_at: null };
 
 export const demoCategories: Category[] = [
   {
     id: 'demo-category-silk',
-    name: 'Silk Sarees',
-    slug: 'silk-sarees',
-    description: 'Kanchipuram and Banarasi silks selected for weddings, celebrations, and heirloom wardrobes.',
+    name: 'New Arrivals',
+    slug: 'new-arrivals-preview',
+    description: 'A temporary preview collection shown until the live supplier catalogue is connected.',
     parent_id: null,
     image_url: mockImages.categories['silk-sarees'],
+    ...demoCategorySource,
     created_at: createdAt,
   },
   {
     id: 'demo-category-cotton',
-    name: 'Cotton Sarees',
-    slug: 'cotton-sarees',
-    description: 'Breathable handloom cotton sarees for effortless everyday elegance.',
+    name: 'Everyday Styles',
+    slug: 'everyday-styles-preview',
+    description: 'Easy everyday fashion shown as a preview before supplier synchronisation.',
     parent_id: null,
     image_url: mockImages.categories['cotton-sarees'],
+    ...demoCategorySource,
     created_at: createdAt,
   },
   {
     id: 'demo-category-designer',
-    name: 'Designer Sarees',
-    slug: 'designer-sarees',
-    description: 'Statement drapes that pair traditional weaving with a modern point of view.',
+    name: 'Trending Now',
+    slug: 'trending-now-preview',
+    description: 'A temporary showcase that will be replaced by current supplier products.',
     parent_id: null,
     image_url: mockImages.products[5],
+    ...demoCategorySource,
     created_at: createdAt,
   },
   {
     id: 'demo-category-lehenga',
-    name: 'Lehengas',
-    slug: 'lehengas',
-    description: 'Celebration-ready lehengas with graceful silhouettes and detailed finishes.',
+    name: 'Festive Edit',
+    slug: 'festive-edit-preview',
+    description: 'Celebration-ready preview pieces until the supplier catalogue goes live.',
     parent_id: null,
     image_url: mockImages.categories.lehengas,
+    ...demoCategorySource,
     created_at: createdAt,
   },
 ];
@@ -66,6 +71,14 @@ const makeProduct = (
   is_active: true,
   avg_rating: 0,
   review_count: 0,
+  source_type: 'inventory',
+  supplier_id: null,
+  supplier_product_id: null,
+  source_cost: null,
+  price_floor: 0,
+  compare_at_price: null,
+  supplier_payload: {},
+  synced_at: null,
   created_at: createdAt,
   category,
   variants: [{
@@ -79,6 +92,10 @@ const makeProduct = (
     is_active: true,
     created_at: createdAt,
     price_override: null,
+    supplier_variant_id: null,
+    source_cost: null,
+    price_floor: 0,
+    synced_at: null,
   }],
 });
 

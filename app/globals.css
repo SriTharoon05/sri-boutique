@@ -4,39 +4,36 @@
 
 @layer base {
   :root {
-    /* Sri Boutique - Warm, Elegant Color Palette */
-    --background: 40 33% 98%;
-    --foreground: 20 15% 15%;
+    /* Sri Boutique — restrained jewel-tone editorial palette */
+    --background: 38 42% 96%;
+    --foreground: 326 24% 16%;
 
-    --card: 40 33% 99%;
-    --card-foreground: 20 15% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 326 24% 16%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 20 15% 15%;
+    --popover-foreground: 326 24% 16%;
 
-    /* Primary: Deep burgundy/maroon for elegance */
-    --primary: 345 35% 35%;
-    --primary-foreground: 40 33% 98%;
+    --primary: 326 30% 22%;
+    --primary-foreground: 38 42% 96%;
 
-    /* Secondary: Warm cream */
-    --secondary: 35 40% 92%;
-    --secondary-foreground: 20 15% 20%;
+    --secondary: 39 76% 64%;
+    --secondary-foreground: 326 24% 16%;
 
-    --muted: 35 25% 90%;
-    --muted-foreground: 20 10% 40%;
+    --muted: 32 22% 89%;
+    --muted-foreground: 326 9% 40%;
 
-    /* Accent: Rose gold */
-    --accent: 350 60% 65%;
-    --accent-foreground: 20 15% 15%;
+    --accent: 343 48% 70%;
+    --accent-foreground: 326 24% 16%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 30 20% 85%;
-    --input: 30 15% 90%;
-    --ring: 345 35% 35%;
+    --border: 326 14% 36%;
+    --input: 326 8% 75%;
+    --ring: 343 48% 58%;
 
-    --radius: 0.75rem;
+    --radius: 0.25rem;
 
     /* Chart colors for admin dashboard */
     --chart-1: 345 35% 45%;
@@ -65,13 +62,13 @@
     --primary: 345 40% 50%;
     --primary-foreground: 20 15% 8%;
 
-    --secondary: 20 12% 18%;
+    --secondary: 39 48% 42%;
     --secondary-foreground: 40 20% 90%;
 
     --muted: 20 12% 20%;
     --muted-foreground: 40 15% 60%;
 
-    --accent: 350 50% 60%;
+    --accent: 343 42% 61%;
     --accent-foreground: 20 15% 8%;
 
     --destructive: 0 62% 50%;
@@ -90,12 +87,12 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-inter), sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Cormorant Garamond', serif;
-    @apply font-medium tracking-tight;
+    font-family: var(--font-inter), sans-serif;
+    @apply font-bold tracking-[-0.04em];
   }
 
   h1 {
@@ -113,11 +110,15 @@
 
 @layer utilities {
   .font-display {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: var(--font-inter), sans-serif;
   }
 
   .font-body {
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-inter), sans-serif;
+  }
+
+  .font-editorial {
+    font-family: var(--font-cormorant), serif;
   }
 
   .text-gradient {
@@ -126,6 +127,20 @@
 
   .glass-effect {
     @apply bg-white/70 backdrop-blur-md;
+  }
+
+  .text-outline {
+    color: transparent;
+    -webkit-text-stroke: 1.5px hsl(var(--foreground));
+  }
+
+  .editorial-shadow {
+    box-shadow: 4px 4px 0 hsl(var(--foreground));
+  }
+
+  .marquee-track {
+    width: max-content;
+    animation: marquee 24s linear infinite;
   }
 
   .hover-lift {
@@ -222,5 +237,18 @@
 @keyframes shimmer {
   to {
     background-position-x: -200%;
+  }
+}
+
+@keyframes marquee {
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

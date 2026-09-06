@@ -3,11 +3,9 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { STORE_ADDRESS } from '@/lib/site';
 import { Card } from '@/components/ui/card';
 import { Mail, MapPin, Instagram, Clock } from 'lucide-react';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Contact Us | Sri Boutique',
-  description: 'Get in touch with Sri Boutique — reach us via email, Instagram, or visit us in Chennai, Tamil Nadu.',
-};
+export const metadata: Metadata = buildPageMetadata('Contact Us', 'Get in touch with Sri Boutique for order support or visit us in Villivakkam, Chennai, Tamil Nadu.', '/contact');
 
 export default function ContactPage() {
   return (

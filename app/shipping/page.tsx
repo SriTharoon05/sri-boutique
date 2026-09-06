@@ -1,11 +1,9 @@
 import { Metadata } from 'next';
 import { MainLayout } from '@/components/layout/main-layout';
 import Link from 'next/link';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Shipping Info | Sri Boutique',
-  description: 'Shipping timelines, charges, and tracking information for Sri Boutique orders.',
-};
+export const metadata: Metadata = buildPageMetadata('Shipping Information', 'Sri Boutique shipping charges, delivery timelines, and tracking information for orders across India.', '/shipping');
 
 export default function ShippingPage() {
   return (

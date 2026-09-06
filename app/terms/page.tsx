@@ -1,10 +1,8 @@
 import { Metadata } from 'next';
 import { MainLayout } from '@/components/layout/main-layout';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Terms & Conditions | Sri Boutique',
-  description: 'Terms and conditions for using the Sri Boutique website and placing orders.',
-};
+export const metadata: Metadata = buildPageMetadata('Terms & Conditions', 'Terms and conditions for using the Sri Boutique website and placing orders.', '/terms');
 
 export default function TermsPage() {
   return (

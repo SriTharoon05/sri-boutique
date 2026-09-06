@@ -1,265 +1,90 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ChevronDown, LayoutDashboard, LogOut, Menu, Package, ShoppingBag, User, X } from 'lucide-react';
 import { useAuth } from '@/components/providers/auth-provider';
 import { useCart } from '@/components/providers/cart-provider';
+import { getDisplayProductImage } from '@/lib/mock-images';
+import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetTrigger,
-} from '@/components/ui/sheet';
-import {
-  ShoppingCart,
-  User,
-  Menu,
-  X,
-  LogOut,
-  Package,
-  Settings,
-  ChevronDown,
-  LayoutDashboard,
-} from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { SearchDialog } from './search-dialog';
 
-// NOTE: these slugs must match the `slug` column in your `categories` table exactly.
-// Update this list whenever you add/rename/remove categories.
-const navLinks = [
-  { href: '/category/silk-sarees', label: 'Silk Sarees' },
-  { href: '/category/cotton-sarees', label: 'Cotton Sarees' },
-  { href: '/category/lehengas', label: 'Lehengas' },
-  { href: '/category/salwar-suits', label: 'Salwar Suits' },
-  { href: '/category/kurtis', label: 'Kurtis' },
-  { href: '/category/blouses', label: 'Blouses' },
-];
+type NavigationCategory = { id: string; name: string; slug: string };
 
 export function Header() {
   const { user, profile, signOut, loading } = useAuth();
   const { itemCount, items } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [navigationCategories, setNavigationCategories] = useState<NavigationCategory[]>([]);
 
-  const subtotal = items.reduce((sum, item) => {
-    const price = item.variant.price_override ?? item.variant.product?.base_price ?? 0;
-    return sum + price * item.quantity;
-  }, 0);
+  useEffect(() => {
+    let active = true;
+    const supabase = createClient();
+    async function loadCategories() {
+      const result = await supabase.from('categories').select('id, name, slug').is('parent_id', null).order('name').limit(50);
+      if (active && !result.error) setNavigationCategories((result.data || []) as NavigationCategory[]);
+    }
+    void loadCategories();
+    return () => { active = false; };
+  }, []);
+
+  const navLinks = navigationCategories.length
+    ? navigationCategories.map((category) => ({ href: `/category/${category.slug}`, label: category.name }))
+    : [{ href: '/#categories', label: 'Shop all' }];
+  const desktopLinks = navLinks.slice(0, 6);
+  const overflowLinks = navLinks.slice(6);
+  const subtotal = items.reduce((sum, item) => sum + (item.variant.price_override ?? item.variant.product?.base_price ?? 0) * item.quantity, 0);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
-            <span className="font-display text-2xl font-semibold tracking-tight text-primary">
-              Sri Boutique
-            </span>
-          </Link>
-
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-
-          {/* Right side actions */}
-          <div className="flex items-center space-x-4">
-            <SearchDialog />
-            {/* Cart */}
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative" aria-label="Open shopping cart">
-                  <ShoppingCart className="h-5 w-5" />
-                  {itemCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                      {itemCount}
-                    </Badge>
-                  )}
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="w-full sm:max-w-lg">
-                <SheetHeader>
-                  <SheetTitle className="font-display">Shopping Cart</SheetTitle>
-                  <SheetDescription className="sr-only">
-                    Review items in your shopping cart
-                  </SheetDescription>
-                </SheetHeader>
-                <div className="mt-8 overflow-y-auto">
-                  {items.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <ShoppingCart className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">Your cart is empty</p>
-                      <Button asChild className="mt-4">
-                        <Link href="/">Continue Shopping</Link>
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="space-y-4">
-                        {items.map((item) => {
-                          const price = item.variant.price_override ?? item.variant.product?.base_price ?? 0;
-                          return (
-                            <div key={item.id} className="flex gap-4 py-4 border-b">
-                              <div className="w-20 h-20 bg-muted rounded-md flex-shrink-0"></div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium truncate">{item.variant.product?.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {item.variant.color} / {item.variant.size}
-                                </p>
-                                <div className="flex items-center justify-between mt-2">
-                                  <span className="font-medium">₹{price.toLocaleString()}</span>
-                                  <span className="text-sm text-muted-foreground">Qty: {item.quantity}</span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div className="mt-6 space-y-4">
-                        <div className="flex justify-between text-lg font-semibold">
-                          <span>Subtotal</span>
-                          <span>₹{subtotal.toLocaleString()}</span>
-                        </div>
-                        <Button asChild className="w-full">
-                          <Link href="/cart">View Cart</Link>
-                        </Button>
-                        <Button asChild variant="outline" className="w-full">
-                          <Link href="/checkout">Checkout</Link>
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </SheetContent>
-            </Sheet>
-
-            {/* User Menu */}
-            {loading ? (
-              <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
-            ) : user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      {profile?.avatar_url ? (
-                        <Image
-                          src={profile.avatar_url}
-                          alt={profile.full_name || 'User'}
-                          width={32}
-                          height={32}
-                          className="h-8 w-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <User className="h-4 w-4 text-primary" />
-                      )}
-                    </div>
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <div className="px-2 py-1.5">
-                    <p className="font-medium">{profile?.full_name || 'User'}</p>
-                    <p className="text-xs text-muted-foreground">{profile?.email}</p>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/account" className="flex items-center">
-                      <User className="mr-2 h-4 w-4" />
-                      My Account
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/account/orders" className="flex items-center">
-                      <Package className="mr-2 h-4 w-4" />
-                      Orders
-                    </Link>
-                  </DropdownMenuItem>
-                  {profile?.role === 'admin' && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <Link href="/admin" className="flex items-center">
-                          <LayoutDashboard className="mr-2 h-4 w-4" />
-                          Admin Dashboard
-                        </Link>
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={signOut} className="text-destructive">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Sign Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button asChild variant="default">
-                <Link href="/auth/login">Sign In</Link>
-              </Button>
-            )}
-
-            {/* Mobile Menu */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
-              aria-expanded={mobileMenuOpen}
-            >
-              {mobileMenuOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
-            </Button>
-          </div>
+    <header className="sticky top-0 z-50 w-full border-b border-foreground/30 bg-background/95 backdrop-blur-md">
+      <div className="overflow-hidden border-b border-foreground/20 bg-secondary text-secondary-foreground">
+        <div className="marquee-track flex h-7 items-center whitespace-nowrap text-[10px] font-black uppercase tracking-[0.18em] sm:text-xs">
+          {[0, 1].map((copy) => <div key={copy} className="flex items-center">{['Fresh drops, zero basic', 'Secure payments', 'Easy support', 'Made to be noticed'].map((text) => <span key={`${copy}-${text}`} className="flex items-center"><span className="mx-4">{text}</span><span aria-hidden="true">✦</span></span>)}</div>)}
         </div>
-
-        {/* Mobile Navigation */}
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="md:hidden overflow-hidden"
-            >
-              <nav className="flex flex-col py-4 space-y-2">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors py-2"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </nav>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
+
+      <div className="container mx-auto flex h-16 items-center justify-between px-4">
+        <Link href="/" aria-label="Sri Boutique home" className="group inline-flex items-center gap-2.5 leading-none">
+          <span className="text-2xl font-black tracking-[-0.08em] sm:text-3xl">SRI</span>
+          <span className="-rotate-2 bg-accent px-2.5 py-1.5 text-[11px] font-black uppercase tracking-wide text-accent-foreground transition-transform group-hover:rotate-0 sm:px-3 sm:text-xs">Boutique</span>
+        </Link>
+
+        <div className="flex items-center gap-1 sm:gap-2">
+          <SearchDialog />
+          <Sheet>
+            <SheetTrigger asChild><Button variant="ghost" size="icon" className="relative" aria-label={`Open shopping bag with ${itemCount} items`}><ShoppingBag className="h-5 w-5" />{itemCount > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-[10px] font-bold">{itemCount}</span>}</Button></SheetTrigger>
+            <SheetContent className="w-full border-l border-foreground/30 sm:max-w-lg">
+              <SheetHeader><SheetTitle className="text-2xl font-black uppercase">Your bag</SheetTitle><SheetDescription>Review your saved items before checkout.</SheetDescription></SheetHeader>
+              <div className="mt-7 max-h-[calc(100vh-10rem)] overflow-y-auto pr-1">
+                {items.length === 0 ? <div className="grid place-items-center border border-dashed border-foreground/50 px-6 py-14 text-center"><ShoppingBag className="mb-4 h-10 w-10" /><p className="font-bold">Your bag needs a main character.</p><Button asChild className="mt-5"><Link href="/#new-drops">Shop new drops</Link></Button></div> : <>
+                  <div className="space-y-3">{items.map((item, index) => {
+                    const price = item.variant.price_override ?? item.variant.product?.base_price ?? 0;
+                    const image = getDisplayProductImage(item.variant.product?.slug || item.variant_id, item.variant.image_urls?.[0], index);
+                    return <div key={item.id} className="flex gap-4 border-b border-foreground/25 py-4"><div className="relative h-24 w-20 shrink-0 overflow-hidden bg-muted"><Image src={image} alt="" fill sizes="80px" className="object-cover" /></div><div className="min-w-0 flex-1"><p className="truncate font-bold">{item.variant.product?.name}</p><p className="mt-1 text-xs uppercase text-muted-foreground">{[item.variant.color, item.variant.size].filter(Boolean).join(' · ')}</p><div className="mt-4 flex justify-between font-bold"><span>₹{price.toLocaleString('en-IN')}</span><span className="text-xs">QTY {item.quantity}</span></div></div></div>;
+                  })}</div>
+                  <div className="mt-6 space-y-3"><div className="flex justify-between text-xl font-black"><span>SUBTOTAL</span><span>₹{subtotal.toLocaleString('en-IN')}</span></div><Button asChild className="w-full"><Link href="/checkout">Checkout</Link></Button><Button asChild variant="outline" className="w-full"><Link href="/cart">Edit bag</Link></Button></div>
+                </>}
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          {loading ? <div className="h-10 w-10 animate-pulse bg-muted" /> : user ? <DropdownMenu>
+            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label="Open account menu"><User className="h-5 w-5" /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-60 border-2 border-foreground"><div className="px-2 py-2"><p className="font-bold">{profile?.full_name || 'Your account'}</p><p className="truncate text-xs text-muted-foreground">{profile?.email}</p></div><DropdownMenuSeparator /><DropdownMenuItem asChild><Link href="/account"><User className="mr-2 h-4 w-4" />My account</Link></DropdownMenuItem><DropdownMenuItem asChild><Link href="/account/orders"><Package className="mr-2 h-4 w-4" />Orders</Link></DropdownMenuItem>{profile?.role === 'admin' && <><DropdownMenuSeparator /><DropdownMenuItem asChild><Link href="/admin"><LayoutDashboard className="mr-2 h-4 w-4" />Admin</Link></DropdownMenuItem></>}<DropdownMenuSeparator /><DropdownMenuItem onClick={signOut} className="text-destructive"><LogOut className="mr-2 h-4 w-4" />Sign out</DropdownMenuItem></DropdownMenuContent>
+          </DropdownMenu> : <Button asChild size="sm" className="hidden sm:inline-flex"><Link href="/auth/login">Sign in</Link></Button>}
+
+          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileMenuOpen((open) => !open)} aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={mobileMenuOpen}>{mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</Button>
+        </div>
+      </div>
+
+      <div className="hidden border-t-2 border-foreground md:block"><nav className="container mx-auto flex h-10 items-center justify-center gap-8 overflow-hidden px-4 text-xs font-bold uppercase tracking-[0.1em]"><Link href="/#new-drops" className="text-accent">New drops</Link>{desktopLinks.map((link) => <Link key={link.href} href={link.href} className="transition-colors hover:text-accent">{link.label}</Link>)}{overflowLinks.length > 0 && <DropdownMenu><DropdownMenuTrigger className="flex items-center gap-1">More <ChevronDown className="h-3 w-3" /></DropdownMenuTrigger><DropdownMenuContent>{overflowLinks.map((link) => <DropdownMenuItem key={link.href} asChild><Link href={link.href}>{link.label}</Link></DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>}</nav></div>
+
+      <AnimatePresence>{mobileMenuOpen && <motion.nav initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden border-t-2 border-foreground bg-foreground text-background md:hidden"><div className="grid px-4 py-5">{navLinks.map((link, index) => <Link key={link.href} href={link.href} onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-between border-b border-background/25 py-3 text-lg font-black uppercase"><span>{link.label}</span><span className="text-xs text-secondary">0{index + 1}</span></Link>)}{!user && <Link href="/auth/login" onClick={() => setMobileMenuOpen(false)} className="mt-4 text-sm font-bold uppercase text-secondary">Sign in →</Link>}</div></motion.nav>}</AnimatePresence>
     </header>
   );
 }

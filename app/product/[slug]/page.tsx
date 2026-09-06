@@ -5,6 +5,8 @@ import { ProductPageContent } from './product-content';
 import { findDemoProduct } from '@/lib/demo-catalog';
 import { absoluteUrl } from '@/lib/site';
 import { getDisplayProductGallery, getDisplayProductImage } from '@/lib/mock-images';
+import type { CatalogProduct } from '@/lib/demo-catalog';
+import { isDemoRecord, merchantReturnPolicy, productSeoDescription, shippingDetails } from '@/lib/seo';
 
 // Force fresh data on every request — without this, Next.js may cache
 // this page's Supabase query results, so stock/price changes in the DB
@@ -35,47 +37,101 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     };
   }
 
+  const catalogProduct = resolvedProduct as CatalogProduct;
+  const description = productSeoDescription(catalogProduct);
+  const image = getDisplayProductImage(catalogProduct.slug, catalogProduct.variants?.[0]?.image_urls?.[0]);
+
   return {
-    title: resolvedProduct.name,
-    description: resolvedProduct.description || `Shop ${resolvedProduct.name} at Sri Boutique.`,
-    alternates: { canonical: absoluteUrl(`/product/${resolvedProduct.slug}`) },
+    title: catalogProduct.name,
+    description,
+    alternates: { canonical: absoluteUrl(`/product/${catalogProduct.slug}`) },
+    robots: isDemoRecord(catalogProduct) ? { index: false, follow: true } : undefined,
     openGraph: {
-      title: `${resolvedProduct.name} | Sri Boutique`,
-      description: resolvedProduct.description || `Shop ${resolvedProduct.name} at Sri Boutique.`,
+      title: `${catalogProduct.name} | Sri Boutique`,
+      description,
       type: 'website',
-      url: absoluteUrl(`/product/${resolvedProduct.slug}`),
-      images: [{ url: getDisplayProductImage(resolvedProduct.slug, resolvedProduct.variants?.[0]?.image_urls?.[0]) }],
+      url: absoluteUrl(`/product/${catalogProduct.slug}`),
+      images: [{ url: image, alt: catalogProduct.name }],
     },
+    twitter: { card: 'summary_large_image', title: `${catalogProduct.name} | Sri Boutique`, description, images: [image] },
   };
 }
 
-// Generate JSON-LD structured data
-function generateStructuredData(product: any) {
-  const variant = product.variants?.[0];
-  const price = variant?.price_override ?? product.base_price;
-
+function productOffer(product: CatalogProduct, variant: CatalogProduct['variants'][number]) {
+  const price = variant.price_override ?? product.base_price;
+  const available = variant.is_active && (product.source_type === 'dropship' || variant.stock_quantity > 0);
   return {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name: product.name,
-    description: product.description,
-    image: getDisplayProductGallery(product.slug, variant?.image_urls || []),
-    offers: {
       '@type': 'Offer',
-      price: price,
+      price,
       priceCurrency: 'INR',
-      availability: variant?.stock_quantity > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      itemCondition: 'https://schema.org/NewCondition',
+      availability: available ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
       url: absoluteUrl(`/product/${product.slug}`),
-    },
-    aggregateRating: product.avg_rating > 0 ? {
+      seller: { '@id': `${absoluteUrl('/')}#store` },
+      shippingDetails: {
+        ...shippingDetails,
+        shippingRate: {
+          ...shippingDetails.shippingRate,
+          value: price >= 2000 ? 0 : 99,
+        },
+      },
+      hasMerchantReturnPolicy: { '@id': merchantReturnPolicy['@id'] },
+  };
+}
+
+function generateStructuredData(product: CatalogProduct) {
+  const variants = product.variants?.filter((variant) => variant.is_active) || [];
+  const firstVariant = variants[0] || product.variants?.[0];
+  const common = {
+    name: product.name,
+    description: productSeoDescription(product),
+    image: getDisplayProductGallery(product.slug, firstVariant?.image_urls || []),
+    brand: { '@type': 'Brand', name: 'Sri Boutique' },
+    aggregateRating: product.avg_rating > 0 && product.review_count > 0 ? {
       '@type': 'AggregateRating',
       ratingValue: product.avg_rating,
       reviewCount: product.review_count,
     } : undefined,
-    brand: {
-      '@type': 'Brand',
-      name: 'Sri Boutique',
-    },
+  };
+
+  const productData = variants.length > 1 ? {
+    '@type': 'ProductGroup',
+    '@id': absoluteUrl(`/product/${product.slug}#product`),
+    productGroupID: product.supplier_product_id || product.id,
+    variesBy: [variants.some((variant) => variant.color) ? 'https://schema.org/color' : null, variants.some((variant) => variant.size) ? 'https://schema.org/size' : null].filter(Boolean),
+    ...common,
+    hasVariant: variants.map((variant) => ({
+      '@type': 'Product',
+      name: `${product.name}${variant.color ? ` - ${variant.color}` : ''}${variant.size ? ` / ${variant.size}` : ''}`,
+      sku: variant.sku,
+      color: variant.color || undefined,
+      size: variant.size || undefined,
+      image: variant.image_urls?.length ? variant.image_urls : common.image,
+      offers: productOffer(product, variant),
+    })),
+  } : {
+    '@type': 'Product',
+    '@id': absoluteUrl(`/product/${product.slug}#product`),
+    ...common,
+    sku: firstVariant?.sku,
+    color: firstVariant?.color || undefined,
+    size: firstVariant?.size || undefined,
+    offers: firstVariant ? productOffer(product, firstVariant) : undefined,
+  };
+
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      productData,
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: absoluteUrl('/') },
+          ...(product.category ? [{ '@type': 'ListItem', position: 2, name: product.category.name, item: absoluteUrl(`/category/${product.category.slug}`) }] : []),
+          { '@type': 'ListItem', position: product.category ? 3 : 2, name: product.name, item: absoluteUrl(`/product/${product.slug}`) },
+        ],
+      },
+    ],
   };
 }
 
@@ -120,7 +176,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     .eq('is_active', true)
     .limit(4) : { data: [] };
 
-  const structuredData = generateStructuredData(resolvedProduct);
+  const structuredData = generateStructuredData(resolvedProduct as CatalogProduct);
 
   return (
     <>

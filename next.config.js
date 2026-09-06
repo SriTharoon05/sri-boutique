@@ -10,6 +10,9 @@ const nextConfig = {
       { protocol: 'https', hostname: 'images.pexels.com' },
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+      { protocol: 'https', hostname: 'shescale.in' },
+      { protocol: 'https', hostname: 'cdn.shescale.in' },
+      { protocol: 'https', hostname: 'she-scale.s3.ap-south-1.amazonaws.com' },
     ],
   },
   async headers() {

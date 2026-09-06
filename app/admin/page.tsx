@@ -8,7 +8,7 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { createClient } from '@/lib/supabase/client';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card } from '@/components/ui/card';
-import { Loader2, Package, ShoppingBag, Users, DollarSign, TrendingUp } from 'lucide-react';
+import { Loader2, Package, ShoppingBag, DollarSign, TrendingUp, Truck } from 'lucide-react';
 
 export default function AdminPage() {
   const { user, profile, loading: authLoading } = useAuth();
@@ -122,7 +122,7 @@ export default function AdminPage() {
         </div>
 
         {/* Navigation Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/products')}>
             <div className="flex items-center gap-4">
               <ShoppingBag className="h-8 w-8 text-primary" />
@@ -149,6 +149,16 @@ export default function AdminPage() {
               <div>
                 <h3 className="font-display text-lg font-semibold">Coupons</h3>
                 <p className="text-sm text-muted-foreground">Create and manage discount codes</p>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/suppliers')}>
+            <div className="flex items-center gap-4">
+              <Truck className="h-8 w-8 text-primary" />
+              <div>
+                <h3 className="font-display text-lg font-semibold">Suppliers</h3>
+                <p className="text-sm text-muted-foreground">Sync catalogues and protect margins</p>
               </div>
             </div>
           </Card>

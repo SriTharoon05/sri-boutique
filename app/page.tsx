@@ -3,6 +3,16 @@ import { HomePageContent } from './home-content';
 import { createPublicClient } from '@/lib/supabase/public';
 import { demoCategories, demoProducts, type CatalogProduct } from '@/lib/demo-catalog';
 import type { Category } from '@/types/database';
+import { buildPageMetadata } from '@/lib/seo';
+
+export const metadata = {
+  ...buildPageMetadata(
+  'Sarees & Indian Fashion, Remixed',
+  'Shop statement sarees and fresh Indian fashion edits from Sri Boutique in Chennai. Secure checkout, transparent pricing, and Pan-India delivery.',
+  '/',
+  ),
+  title: { absolute: 'Sri Boutique | Sarees & Indian Fashion, Remixed' },
+};
 
 export const revalidate = 300;
 

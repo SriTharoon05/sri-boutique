@@ -77,14 +77,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const { data: variants } = await supabase
+      const { data: variants, error: variantsError } = await supabase
         .from('product_variants')
         .select('*, product:products (*)')
         .in('id', storedItems.map((item) => item.variantId));
 
-      const items = (variants || []).map((variant: any) => {
+      if (variantsError) {
+        console.error('Error loading guest cart:', variantsError);
+        setState({ cartId: null, items: [], itemCount: 0, subtotal: 0, loading: false });
+        return;
+      }
+
+      const items: CartItemWithDetails[] = (variants || []).flatMap((variant: any) => {
         const stored = storedItems.find((item) => item.variantId === variant.id)!;
-        return {
+        const product = Array.isArray(variant.product) ? variant.product[0] : variant.product;
+        if (!stored || !product) return [];
+        return [{
           id: `local:${variant.id}`,
           cart_id: 'local',
           variant_id: variant.id,
@@ -92,10 +100,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
           created_at: new Date(0).toISOString(),
           variant: {
             ...variant,
-            product: Array.isArray(variant.product) ? variant.product[0] : variant.product,
+            product,
           },
-        } as CartItemWithDetails;
+        } as CartItemWithDetails];
       });
+      const visibleVariantIds = new Set(items.map((item) => item.variant_id));
+      const cleanedGuestItems = storedItems.filter((item) => visibleVariantIds.has(item.variantId));
+      if (cleanedGuestItems.length !== storedItems.length) setGuestItems(cleanedGuestItems);
       const totals = calculateTotals(items);
       setState({ cartId: null, items, ...totals, loading: false });
       return;
@@ -110,7 +121,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const { data: items } = await supabase
+    const { data: items, error: itemsError } = await supabase
       .from('cart_items')
       .select(`
         *,
@@ -121,13 +132,31 @@ export function CartProvider({ children }: { children: ReactNode }) {
       `)
       .eq('cart_id', carts.id);
 
-    const cartItems = (items || []).map((item: any) => ({
-      ...item,
-      variant: {
-        ...item.variant,
-        product: Array.isArray(item.variant.product) ? item.variant.product[0] : item.variant.product,
-      },
-    })) as CartItemWithDetails[];
+    if (itemsError) {
+      console.error('Error loading cart items:', itemsError);
+      setState({ cartId: carts.id, items: [], itemCount: 0, subtotal: 0, loading: false });
+      return;
+    }
+
+    const staleItemIds: string[] = [];
+    const cartItems = (items || []).flatMap((item: any) => {
+      const variant = item.variant;
+      const product = variant && (Array.isArray(variant.product) ? variant.product[0] : variant.product);
+      if (!variant || !product) {
+        staleItemIds.push(item.id);
+        return [];
+      }
+      return [{ ...item, variant: { ...variant, product } } as CartItemWithDetails];
+    });
+
+    if (staleItemIds.length > 0) {
+      const { error: cleanupError } = await supabase
+        .from('cart_items')
+        .delete()
+        .eq('cart_id', carts.id)
+        .in('id', staleItemIds);
+      if (cleanupError) console.error('Could not remove stale cart items:', cleanupError);
+    }
 
     const { itemCount, subtotal } = calculateTotals(cartItems);
 

@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import { Providers } from './providers';
 import { SITE_NAME, SITE_URL } from '@/lib/site';
+import { merchantReturnPolicy } from '@/lib/seo';
 
 const inter = localFont({
   src: [
@@ -32,12 +33,10 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   applicationName: SITE_NAME,
   title: {
-    default: 'Sri Boutique | Premium Ethnic Wear & Sarees',
+    default: 'Sri Boutique | Sarees & Indian Fashion, Remixed',
     template: '%s | Sri Boutique',
   },
-  description: 'Discover exquisite handcrafted sarees, ethnic wear, and timeless elegance at Sri Boutique. Premium quality Indian fashion for the modern woman.',
-  keywords: ['sarees', 'ethnic wear', 'Indian fashion', 'boutique', 'handloom', 'silk sarees', 'designer wear'],
-  alternates: { canonical: '/' },
+  description: 'Shop statement sarees and fresh Indian fashion edits from Sri Boutique in Chennai. Secure checkout, transparent pricing, and Pan-India delivery.',
   category: 'shopping',
   creator: SITE_NAME,
   publisher: SITE_NAME,
@@ -46,13 +45,13 @@ export const metadata: Metadata = {
     locale: 'en_IN',
     url: SITE_URL,
     siteName: 'Sri Boutique',
-    title: 'Sri Boutique | Premium Ethnic Wear & Sarees',
-    description: 'Discover exquisite handcrafted sarees, ethnic wear, and timeless elegance at Sri Boutique.',
+    title: 'Sri Boutique | Sarees & Indian Fashion, Remixed',
+    description: 'Statement sarees and fresh Indian fashion edits, curated in Chennai and delivered across India.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Sri Boutique | Premium Ethnic Wear & Sarees',
-    description: 'Discover exquisite handcrafted sarees, ethnic wear, and timeless elegance at Sri Boutique.',
+    title: 'Sri Boutique | Sarees & Indian Fashion, Remixed',
+    description: 'Statement sarees and fresh Indian fashion edits, curated in Chennai and delivered across India.',
   },
   robots: {
     index: true,
@@ -65,19 +64,25 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
+  verification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION }
+    : undefined,
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#7f1d1d',
+  themeColor: '#49253b',
 };
 
 const localBusinessSchema = {
   '@context': 'https://schema.org',
-  '@type': 'ClothingStore',
+  '@type': ['OnlineStore', 'ClothingStore'],
+  '@id': `${SITE_URL}/#store`,
   name: SITE_NAME,
   url: SITE_URL,
+  email: 'sriboutiquestore@gmail.com',
+  priceRange: '₹₹',
   address: {
     '@type': 'PostalAddress',
     streetAddress: 'Sidco Nagar 9th Street, Villivakkam',
@@ -85,6 +90,14 @@ const localBusinessSchema = {
     addressRegion: 'Tamil Nadu',
     addressCountry: 'IN',
   },
+  contactPoint: {
+    '@type': 'ContactPoint',
+    contactType: 'customer service',
+    email: 'sriboutiquestore@gmail.com',
+    areaServed: 'IN',
+    availableLanguage: ['English', 'Tamil'],
+  },
+  hasMerchantReturnPolicy: merchantReturnPolicy,
 };
 
 export default function RootLayout({

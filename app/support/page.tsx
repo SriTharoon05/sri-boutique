@@ -3,11 +3,9 @@ import Link from 'next/link';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card } from '@/components/ui/card';
 import { Truck, RefreshCw, Ruler, HelpCircle, ArrowRight } from 'lucide-react';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Support | Sri Boutique',
-  description: 'Get help with shipping, returns, sizing, and frequently asked questions at Sri Boutique.',
-};
+export const metadata: Metadata = buildPageMetadata('Customer Support', 'Get help with Sri Boutique orders, shipping, returns, sizing, and frequently asked questions.', '/support');
 
 const supportLinks = [
   {

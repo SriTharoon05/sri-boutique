@@ -46,6 +46,9 @@ export interface Database {
           description: string | null;
           parent_id: string | null;
           image_url: string | null;
+          supplier_id: string | null;
+          supplier_category_id: string | null;
+          synced_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -55,6 +58,9 @@ export interface Database {
           description?: string | null;
           parent_id?: string | null;
           image_url?: string | null;
+          supplier_id?: string | null;
+          supplier_category_id?: string | null;
+          synced_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -64,6 +70,9 @@ export interface Database {
           description?: string | null;
           parent_id?: string | null;
           image_url?: string | null;
+          supplier_id?: string | null;
+          supplier_category_id?: string | null;
+          synced_at?: string | null;
           created_at?: string;
         };
       };
@@ -78,6 +87,14 @@ export interface Database {
           is_active: boolean;
           avg_rating: number;
           review_count: number;
+          source_type: 'inventory' | 'dropship';
+          supplier_id: string | null;
+          supplier_product_id: string | null;
+          source_cost: number | null;
+          price_floor: number;
+          compare_at_price: number | null;
+          supplier_payload: Json;
+          synced_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -90,6 +107,14 @@ export interface Database {
           is_active?: boolean;
           avg_rating?: number;
           review_count?: number;
+          source_type?: 'inventory' | 'dropship';
+          supplier_id?: string | null;
+          supplier_product_id?: string | null;
+          source_cost?: number | null;
+          price_floor?: number;
+          compare_at_price?: number | null;
+          supplier_payload?: Json;
+          synced_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -102,6 +127,14 @@ export interface Database {
           is_active?: boolean;
           avg_rating?: number;
           review_count?: number;
+          source_type?: 'inventory' | 'dropship';
+          supplier_id?: string | null;
+          supplier_product_id?: string | null;
+          source_cost?: number | null;
+          price_floor?: number;
+          compare_at_price?: number | null;
+          supplier_payload?: Json;
+          synced_at?: string | null;
           created_at?: string;
         };
       };
@@ -116,6 +149,10 @@ export interface Database {
           stock_quantity: number;
           image_urls: string[];
           is_active: boolean;
+          supplier_variant_id: string | null;
+          source_cost: number | null;
+          price_floor: number;
+          synced_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -128,6 +165,10 @@ export interface Database {
           stock_quantity?: number;
           image_urls?: string[];
           is_active?: boolean;
+          supplier_variant_id?: string | null;
+          source_cost?: number | null;
+          price_floor?: number;
+          synced_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -140,6 +181,10 @@ export interface Database {
           stock_quantity?: number;
           image_urls?: string[];
           is_active?: boolean;
+          supplier_variant_id?: string | null;
+          source_cost?: number | null;
+          price_floor?: number;
+          synced_at?: string | null;
           created_at?: string;
         };
       };
@@ -298,6 +343,11 @@ export interface Database {
           variant_info: Json;
           quantity: number;
           price_at_purchase: number;
+          supplier_id: string | null;
+          supplier_product_id: string | null;
+          supplier_variant_id: string | null;
+          source_cost: number | null;
+          estimated_profit: number | null;
           created_at: string;
         };
         Insert: {
@@ -308,6 +358,11 @@ export interface Database {
           variant_info: Json;
           quantity: number;
           price_at_purchase: number;
+          supplier_id?: string | null;
+          supplier_product_id?: string | null;
+          supplier_variant_id?: string | null;
+          source_cost?: number | null;
+          estimated_profit?: number | null;
           created_at?: string;
         };
         Update: {
@@ -318,6 +373,11 @@ export interface Database {
           variant_info?: Json;
           quantity?: number;
           price_at_purchase?: number;
+          supplier_id?: string | null;
+          supplier_product_id?: string | null;
+          supplier_variant_id?: string | null;
+          source_cost?: number | null;
+          estimated_profit?: number | null;
           created_at?: string;
         };
       };

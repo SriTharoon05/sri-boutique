@@ -5,11 +5,9 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import { mockImages } from '@/lib/mock-images';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Our Story | Sri Boutique',
-  description: 'Discover the heritage and craftsmanship behind Sri Boutique — handwoven sarees and ethnic wear, made with artisans across India.',
-};
+export const metadata: Metadata = buildPageMetadata('Our Story', 'Discover the heritage and craftsmanship behind Sri Boutique — handwoven sarees and ethnic wear, made with artisans across India.', '/about');
 
 export default function AboutPage() {
   return (

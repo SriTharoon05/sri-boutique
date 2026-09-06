@@ -1,411 +1,123 @@
 'use client';
 
-import Link from 'next/link';
+import { useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
-import { ArrowRight, Star, Truck, Shield, Headphones } from 'lucide-react';
+import { ArrowDownRight, ArrowRight, Check, RotateCcw, ShieldCheck, Sparkles, Truck } from 'lucide-react';
 import type { Category } from '@/types/database';
 import type { CatalogProduct } from '@/lib/demo-catalog';
-import { useState } from 'react';
+import { getDisplayCategoryImage, getDisplayProductImage, mockImages } from '@/lib/mock-images';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { getDisplayCategoryImage, getDisplayProductImage, mockImages } from '@/lib/mock-images';
-
-const fadeInUp = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.5 },
-};
-
-const staggerContainer = {
-  animate: {
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
 
 interface HomePageContentProps {
   categories: (Category & { _count?: number })[];
   products: CatalogProduct[];
 }
 
+const reveal = { initial: { opacity: 0, y: 28 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: '-80px' }, transition: { duration: 0.55 } };
+
+function Eyebrow({ children, inverse = false }: { children: React.ReactNode; inverse?: boolean }) {
+  return <p className={`mb-3 text-xs font-black uppercase tracking-[.22em] ${inverse ? 'text-secondary' : 'text-primary'}`}>{children}</p>;
+}
+
 export function HomePageContent({ categories, products }: HomePageContentProps) {
   const [email, setEmail] = useState('');
   const [subscribing, setSubscribing] = useState(false);
+  const firstCategory = categories[0];
 
-  const subscribe = async (event: React.FormEvent<HTMLFormElement>) => {
+  async function subscribe(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubscribing(true);
     try {
-      const response = await fetch('/api/newsletter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
+      const response = await fetch('/api/newsletter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Could not subscribe');
       setEmail('');
-      toast.success('You are subscribed to Sri Boutique updates');
+      toast.success('You are on the Sri list ✦');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not subscribe');
     } finally {
       setSubscribing(false);
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="relative h-[85vh] min-h-[600px] flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/10" />
-        <Image
-          src={mockImages.hero}
-          alt="Saree mannequins displayed in a boutique window"
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-center opacity-20"
-        />
-
-        <div className="container mx-auto px-4 relative z-10">
-          <motion.div
-            className="max-w-3xl mx-auto text-center"
-            initial="initial"
-            animate="animate"
-            variants={staggerContainer}
-          >
-            <motion.span
-              variants={fadeInUp}
-              className="inline-block text-sm font-medium tracking-widest text-primary mb-6"
-            >
-              HANDCRAFTED WITH LOVE
-            </motion.span>
-
-            <motion.h1
-              variants={fadeInUp}
-              className="font-display text-5xl md:text-6xl lg:text-7xl font-semibold text-foreground mb-6 leading-tight"
-            >
-              Timeless Elegance,{' '}
-              <span className="text-primary">Woven</span> Into Every Thread
-            </motion.h1>
-
-            <motion.p
-              variants={fadeInUp}
-              className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto"
-            >
-              Discover our curated collection of handcrafted sarees and ethnic wear,
-              where tradition meets contemporary sophistication.
-            </motion.p>
-
-            <motion.div
-              variants={fadeInUp}
-              className="flex flex-wrap justify-center gap-4"
-            >
-              <Button asChild size="lg" className="text-base">
-                <Link href="#categories">
-                  Explore Collection
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg" className="text-base">
-                <Link href="/about">Our Story</Link>
-              </Button>
-            </motion.div>
-          </motion.div>
-        </div>
-
-        {/* Decorative elements */}
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
-      </section>
-
-      {/* Trust Badges */}
-      <section className="py-12 border-b bg-background">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {[
-              { icon: Truck, title: 'Free Shipping', desc: 'Orders over ₹2000' },
-              { icon: Shield, title: 'Secure Payment', desc: '100% protected' },
-              { icon: Headphones, title: 'Personal Support', desc: 'Help when you need it' },
-              { icon: Star, title: 'Premium Quality', desc: 'Handcrafted products' },
-            ].map((item, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="flex items-center gap-4 justify-center md:justify-start"
-              >
-                <div className="p-3 rounded-full bg-primary/10">
-                  <item.icon className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium text-sm">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">{item.desc}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Categories Section */}
-      <section id="categories" className="py-16 md:py-24">
-        <div className="container mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <span className="text-sm font-medium tracking-widest text-primary mb-4 block">
-              SHOP BY CATEGORY
-            </span>
-            <h2 className="font-display text-3xl md:text-4xl font-semibold">
-              Find Your Perfect Style
-            </h2>
-          </motion.div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            {categories.map((category, index) => (
-              <motion.div
-                key={category.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <Link href={`/category/${category.slug}`}>
-                  <Card className="group overflow-hidden border-0 shadow-none">
-                    <div className="relative aspect-[3/4] overflow-hidden rounded-lg">
-                      <Image
-                          src={getDisplayCategoryImage(category.slug, category.image_url, index)}
-                          alt={category.name}
-                          fill
-                          sizes="(max-width: 768px) 50vw, 25vw"
-                          className="object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-                      <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
-                        <h3 className="font-display text-xl md:text-2xl font-medium text-white mb-1">
-                          {category.name}
-                        </h3>
-                        {category._count && (
-                          <p className="text-sm text-white/80">{category._count} items</p>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Featured Products */}
-      <section className="py-16 md:py-24 bg-secondary/20">
-        <div className="container mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-12"
-          >
-            <div>
-              <span className="text-sm font-medium tracking-widest text-primary mb-4 block">
-                NEW ARRIVALS
-              </span>
-              <h2 className="font-display text-3xl md:text-4xl font-semibold">
-                Our Latest Collection
-              </h2>
+    <div className="overflow-hidden">
+      <section className="border-b border-foreground/30">
+        <div className="grid min-h-[calc(100svh-7rem)] lg:grid-cols-[1.08fr_.92fr]">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative flex flex-col justify-between bg-foreground px-4 py-10 text-background sm:px-8 lg:px-[max(3rem,calc((100vw-1280px)/2))] lg:py-14">
+            <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-[.2em] text-secondary">Chennai · India</span><span className="rotate-3 border border-background/60 px-3 py-1 text-[10px] font-black uppercase">Drop 01 / 26</span></div>
+            <div className="py-14 lg:py-20">
+              <Eyebrow inverse>Tradition, remixed</Eyebrow>
+              <h1 className="max-w-4xl text-[clamp(3.5rem,8vw,7.8rem)] font-black leading-[.82] tracking-[-.075em]">
+                <span className="block">Wear</span>
+                <span className="-mt-[.28em] block font-editorial font-medium italic text-secondary">your</span>
+                <span className="-mt-[.18em] block font-editorial font-medium italic text-accent">own era.</span>
+              </h1>
+              <p className="mt-8 max-w-lg text-base leading-relaxed text-background/70 sm:text-lg">Statement sarees and ethnic edits for the screenshots, celebrations, and stories you actually want to remember.</p>
             </div>
-            <Button asChild variant="outline" className="self-start md:self-auto">
-              <Link href="/category/silk-sarees">
-                View All <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+            <div className="flex flex-wrap items-center gap-3"><Button asChild size="lg" className="border-background bg-background text-foreground hover:border-secondary hover:bg-secondary"><Link href="#new-drops">Shop the drop <ArrowDownRight className="ml-2 h-4 w-4" /></Link></Button><Button asChild size="lg" className="border-background bg-transparent text-background hover:border-accent hover:bg-accent hover:text-foreground"><Link href="#categories">Find your vibe</Link></Button></div>
           </motion.div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+          <motion.div initial={{ opacity: 0, scale: 1.02 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: .75 }} className="relative min-h-[68svh] overflow-hidden border-t border-foreground/30 bg-accent lg:min-h-full lg:border-l lg:border-t-0">
+            <Image src={mockImages.hero} alt="Colorful sarees styled on boutique mannequins" fill priority sizes="(max-width: 1024px) 100vw, 46vw" className="object-cover saturate-[.98] contrast-[1.02]" />
+            <div className="absolute inset-x-0 bottom-0 flex items-end justify-between bg-gradient-to-t from-black/85 via-black/25 to-transparent p-5 pt-32 text-white sm:p-8"><div><p className="text-xs font-black uppercase tracking-[.2em]">The mood</p><p className="mt-1 text-2xl font-black uppercase">Not here to blend in.</p></div><span className="grid h-14 w-14 rotate-6 place-items-center rounded-full bg-secondary text-center text-[9px] font-black uppercase leading-tight text-foreground">Fresh<br />edit</span></div>
+          </motion.div>
+        </div>
+      </section>
+
+      <section aria-label="Store benefits" className="overflow-hidden border-b border-foreground/30 bg-accent/75 py-3">
+        <div className="marquee-track flex whitespace-nowrap text-sm font-black uppercase tracking-[.08em]">{[0, 1].map((copy) => <div key={copy} className="flex">{['Expressive edits', 'Secure checkout', 'Fresh drops', 'Pan-India delivery', 'Real support'].map((text) => <span key={`${copy}-${text}`} className="flex items-center"><span className="mx-6">{text}</span><span>✳</span></span>)}</div>)}</div>
+      </section>
+
+      <section id="categories" className="container mx-auto px-4 py-16 md:py-24">
+        <motion.div {...reveal} className="mb-10 flex items-end justify-between gap-5"><div><Eyebrow>Choose your energy</Eyebrow><h2 className="max-w-3xl text-4xl font-black uppercase leading-[.9] sm:text-6xl">Shop by<br />current mood.</h2></div><span className="hidden max-w-xs text-right text-sm text-muted-foreground md:block">Categories update automatically when a supplier catalogue is synced.</span></motion.div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-5">
+          {categories.map((category, index) => <motion.div key={category.id} {...reveal} transition={{ duration: .45, delay: index * .07 }} className={index === 0 ? 'col-span-2 md:col-span-1' : ''}>
+            <Link href={`/category/${category.slug}`} className="group block">
+              <div className="relative aspect-[3/4] overflow-hidden border border-foreground/35 bg-muted"><Image src={getDisplayCategoryImage(category.slug, category.image_url, index)} alt={category.name} fill sizes="(max-width: 768px) 50vw, 25vw" className="object-cover saturate-[.88] transition duration-500 group-hover:scale-105 group-hover:saturate-100" /><span className="absolute left-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-background text-[11px] font-black">0{index + 1}</span><div className="absolute inset-x-0 bottom-0 bg-foreground/85 p-3 text-background sm:p-4"><div className="flex items-center justify-between gap-2"><h3 className="text-base font-bold tracking-tight sm:text-xl">{category.name}</h3><ArrowDownRight className="h-5 w-5 shrink-0 transition-transform group-hover:-rotate-45" /></div>{Boolean(category._count) && <p className="mt-1 text-[10px] uppercase text-background/65">{category._count} styles</p>}</div></div>
+            </Link>
+          </motion.div>)}
+        </div>
+      </section>
+
+      <section id="new-drops" className="border-y border-foreground/30 bg-accent/10 py-16 md:py-24">
+        <div className="container mx-auto px-4">
+          <motion.div {...reveal} className="mb-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><Eyebrow>Just landed</Eyebrow><h2 className="text-5xl font-black leading-[.9] sm:text-7xl">New<br /><span className="font-editorial font-medium italic text-accent">drops.</span></h2></div>{firstCategory && <Button asChild variant="outline"><Link href={`/category/${firstCategory.slug}`}>View collection <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>}</motion.div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-4 md:gap-x-5">
             {products.map((product, index) => {
               const variant = product.variants?.[0];
               const price = variant?.price_override ?? product.base_price;
+              const compareAt = product.compare_at_price;
               const image = getDisplayProductImage(product.slug, variant?.image_urls?.[0], index);
-
-              return (
-                <motion.div
-                  key={product.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  <Link href={`/product/${product.slug}`}>
-                    <Card className="group overflow-hidden border-0 shadow-none bg-background">
-                      <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-muted">
-                        <Image
-                            src={image}
-                            alt={product.name}
-                            fill
-                            sizes="(max-width: 768px) 50vw, 25vw"
-                            className="object-cover transition-transform duration-500 group-hover:scale-105"
-                          />
-
-                        {/* Quick view overlay */}
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                          <span className="text-white text-sm font-medium">Quick View</span>
-                        </div>
-
-                        {/* Rating badge */}
-                        {product.avg_rating > 0 && (
-                          <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium">
-                            <Star className="h-3 w-3 fill-primary text-primary" />
-                            {product.avg_rating.toFixed(1)}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="mt-4 space-y-2">
-                        <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                          {product.category?.name}
-                        </p>
-                        <h3 className="font-medium text-sm md:text-base line-clamp-2 group-hover:text-primary transition-colors">
-                          {product.name}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <span className="font-display text-lg font-semibold">
-                            ₹{price?.toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    </Card>
-                  </Link>
-                </motion.div>
-              );
+              const fulfilment = product.source_type === 'dropship' ? 'Supplier fulfilled' : (variant?.stock_quantity || 0) > 0 ? 'Ready to ship' : 'Preview';
+              return <motion.article key={product.id} {...reveal} transition={{ duration: .45, delay: index * .06 }} className="group">
+                <Link href={`/product/${product.slug}`} className="block">
+                  <div className="relative aspect-[3/4] overflow-hidden border border-foreground/35 bg-muted"><Image src={image} alt={product.name} fill sizes="(max-width: 768px) 50vw, 25vw" className="object-cover saturate-[.9] transition duration-500 group-hover:scale-[1.04] group-hover:saturate-100" /><span className={`absolute left-2 top-2 px-2 py-1 text-[9px] font-bold uppercase tracking-wider ${index % 2 ? 'bg-secondary' : 'bg-accent'}`}>{index === 0 ? 'New' : fulfilment}</span><span className="absolute inset-x-3 bottom-3 translate-y-3 bg-foreground/90 py-3 text-center text-xs font-bold text-background opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">View details</span></div>
+                  <div className="pt-3"><p className="text-[10px] font-bold uppercase tracking-[.15em] text-muted-foreground">{product.category?.name || 'Sri edit'}</p><h3 className="mt-1 min-h-10 text-sm font-bold leading-tight sm:text-base">{product.name}</h3><div className="mt-2 flex flex-wrap items-center gap-2"><span className="font-black">₹{price.toLocaleString('en-IN')}</span>{compareAt && compareAt > price && <span className="text-xs text-muted-foreground line-through">₹{compareAt.toLocaleString('en-IN')}</span>}</div></div>
+                </Link>
+              </motion.article>;
             })}
           </div>
         </div>
       </section>
 
-      {/* Brand Story Section */}
-      <section className="py-16 md:py-24">
-        <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-center">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="relative"
-            >
-              <div className="relative aspect-square rounded-lg overflow-hidden">
-                <Image
-                  src={mockImages.heritage}
-                  alt="Traditional handloom weaving"
-                  fill
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                  className="object-cover"
-                />
-              </div>
-              <div className="absolute -bottom-4 -right-4 md:-bottom-8 md:-right-8 w-32 md:w-48 aspect-square bg-primary/10 rounded-full" />
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="space-y-6"
-            >
-              <div>
-                <span className="text-sm font-medium tracking-widest text-primary mb-4 block">
-                  OUR HERITAGE
-                </span>
-                <h2 className="font-display text-3xl md:text-4xl font-semibold">
-                  Crafted With Care,{' '}
-                  <span className="text-primary">Worn With Pride</span>
-                </h2>
-              </div>
-
-              <p className="text-muted-foreground leading-relaxed">
-                At Sri Boutique, every piece tells a story. We work directly with
-                skilled artisans across India, preserving traditional weaving
-                techniques while embracing contemporary designs that suit the
-                modern lifestyle.
-              </p>
-
-              <p className="text-muted-foreground leading-relaxed">
-                Our commitment to quality means each saree and outfit is
-                hand-inspected before reaching you, ensuring you receive nothing
-                but the finest craftsmanship.
-              </p>
-
-              <div className="flex flex-wrap gap-6 pt-4">
-                <div>
-                  <p className="font-display text-2xl font-semibold text-primary">Handpicked</p>
-                  <p className="text-sm text-muted-foreground">Curated collections</p>
-                </div>
-                <div>
-                  <p className="font-display text-2xl font-semibold text-primary">Quality checked</p>
-                  <p className="text-sm text-muted-foreground">Before dispatch</p>
-                </div>
-                <div>
-                  <p className="font-display text-2xl font-semibold text-primary">Pan-India</p>
-                  <p className="text-sm text-muted-foreground">Secure delivery</p>
-                </div>
-              </div>
-
-              <Button asChild size="lg">
-                <Link href="/about">
-                  Read Our Story <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </motion.div>
-          </div>
-        </div>
+      <section className="grid border-b border-foreground/30 lg:grid-cols-2">
+        <div className="relative min-h-[520px] overflow-hidden border-b border-foreground/30 lg:border-b-0 lg:border-r"><Image src={mockImages.heritage} alt="Close-up of colorful Indian textile craftsmanship" fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover saturate-[.82]" /><div className="absolute left-5 top-5 border border-foreground/50 bg-secondary/90 px-4 py-3 text-sm font-bold editorial-shadow">Texture is the trend</div></div>
+        <motion.div {...reveal} className="flex flex-col justify-center bg-secondary/70 px-5 py-16 sm:px-10 lg:px-16"><Eyebrow>Made with intention</Eyebrow><h2 className="text-5xl font-black leading-[.92] sm:text-7xl">Classic craft.<br /><span className="font-editorial font-medium italic text-accent">New attitude.</span></h2><p className="mt-7 max-w-xl text-lg leading-relaxed">We curate expressive Indian fashion for real wardrobes—clear product details, quality checks, protected payments, and support when you need a human answer.</p><div className="mt-8 grid gap-3 sm:grid-cols-2">{['Curated catalogue', 'Quality-focused selection', 'Transparent pricing', 'Chennai-based support'].map((text) => <p key={text} className="flex items-center gap-2 border-t border-foreground/40 pt-3 text-sm font-semibold"><Check className="h-4 w-4" />{text}</p>)}</div><Button asChild className="mt-9 self-start"><Link href="/about">Meet Sri Boutique <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></motion.div>
       </section>
 
-      {/* Newsletter Section */}
-      <section className="py-16 md:py-24 bg-primary text-primary-foreground">
-        <div className="container mx-auto px-4 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="max-w-2xl mx-auto space-y-6"
-          >
-            <span className="text-sm font-medium tracking-widest opacity-80">
-              STAY CONNECTED
-            </span>
-            <h2 className="font-display text-3xl md:text-4xl font-semibold">
-              Join Our Exclusive Circle
-            </h2>
-            <p className="text-primary-foreground/80">
-              Be the first to know about new collections, exclusive offers,
-              and styling tips from our experts.
-            </p>
+      <section className="container mx-auto px-4 py-16 md:py-20">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[
+          [Truck, 'Pan-India delivery', 'Tracked fulfilment updates'], [ShieldCheck, 'Protected payments', 'Checkout secured by Razorpay'], [RotateCcw, 'Clear returns', 'Policies written in plain language'], [Sparkles, 'Always fresh', 'New supplier drops sync in'],
+        ].map(([Icon, title, copy]) => { const FeatureIcon = Icon as typeof Truck; return <div key={String(title)} className="border border-foreground/35 p-5 transition-colors hover:bg-secondary/60"><FeatureIcon className="h-6 w-6" /><h3 className="mt-7 text-base font-bold">{String(title)}</h3><p className="mt-1 text-sm text-muted-foreground">{String(copy)}</p></div>; })}</div>
+      </section>
 
-            <form onSubmit={subscribe} className="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto">
-              <label htmlFor="newsletter-email" className="sr-only">Email address</label>
-              <Input
-                id="newsletter-email"
-                type="email"
-                required
-                autoComplete="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="h-11 bg-background text-foreground"
-              />
-              <Button type="submit" size="lg" variant="secondary" disabled={subscribing}>
-                {subscribing ? 'Subscribing…' : 'Subscribe'}
-              </Button>
-            </form>
-          </motion.div>
-        </div>
+      <section className="border-t border-foreground/30 bg-accent/70 px-4 py-16 md:py-24">
+        <motion.div {...reveal} className="container mx-auto grid gap-10 lg:grid-cols-[1fr_.8fr] lg:items-end"><div><p className="text-xs font-black uppercase tracking-[.22em]">The inbox drop</p><h2 className="mt-3 text-5xl font-black leading-[.9] sm:text-7xl">Get first<br /><span className="font-editorial font-medium italic">dibs.</span></h2><p className="mt-5 max-w-xl font-medium">New edits, restocks, and offers—sent occasionally, never annoyingly.</p></div><form onSubmit={subscribe} className="flex flex-col gap-3 sm:flex-row"><label htmlFor="newsletter-email" className="sr-only">Email address</label><Input id="newsletter-email" type="email" required autoComplete="email" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} className="h-12 border border-foreground/50 bg-background font-medium placeholder:text-foreground/45" /><Button type="submit" size="lg" disabled={subscribing} className="h-12">{subscribing ? 'Joining…' : 'Join the list'}</Button></form></motion.div>
       </section>
     </div>
   );

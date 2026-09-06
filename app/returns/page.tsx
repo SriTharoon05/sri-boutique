@@ -1,10 +1,8 @@
 import { Metadata } from 'next';
 import { MainLayout } from '@/components/layout/main-layout';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Returns & Exchanges | Sri Boutique',
-  description: 'Our returns, exchange, and refund policy at Sri Boutique.',
-};
+export const metadata: Metadata = buildPageMetadata('Returns & Exchanges', 'Read Sri Boutique’s 7-day return and exchange policy, eligibility requirements, and refund timelines.', '/returns');
 
 export default function ReturnsPage() {
   return (

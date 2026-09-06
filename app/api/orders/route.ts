@@ -39,6 +39,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { data: commerce } = await supabase.from('commerce_settings').select('checkout_enabled').eq('id', true).maybeSingle();
+    if (commerce && !commerce.checkout_enabled) {
+      return NextResponse.json({ error: 'Checkout is temporarily paused. Please try again later.' }, { status: 503 });
+    }
+
     const body = await request.json();
     const { shippingAddress, phone, couponId } = body;
 

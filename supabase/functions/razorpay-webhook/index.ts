@@ -40,6 +40,21 @@ async function sendOrderEmail(
   }
 }
 
+async function dispatchDropshipOrder(orderId: string) {
+  const siteUrl = Deno.env.get("SITE_URL")?.replace(/\/$/, "");
+  const secret = Deno.env.get("DROPSHIP_DISPATCH_SECRET");
+  if (!siteUrl || !secret) {
+    console.warn("Supplier dispatch skipped: SITE_URL or DROPSHIP_DISPATCH_SECRET is not configured");
+    return;
+  }
+  const response = await fetch(`${siteUrl}/api/internal/supplier-orders/dispatch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
+    body: JSON.stringify({ orderId }),
+  });
+  if (!response.ok) throw new Error(`Supplier dispatch returned ${response.status}: ${(await response.text()).slice(0, 500)}`);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -145,6 +160,14 @@ Deno.serve(async (req: Request) => {
         if (updateError) {
           console.error("Error updating order:", updateError);
         }
+      }
+
+      try {
+        await dispatchDropshipOrder(orderId);
+      } catch (dispatchError) {
+        // Payment acknowledgement must not fail because a supplier is offline.
+        // The idempotent supplier-order row can be retried from the admin panel.
+        console.error("Dropship dispatch failed:", dispatchError);
       }
 
 

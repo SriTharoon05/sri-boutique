@@ -22,12 +22,14 @@ export async function POST(request: NextRequest) {
 
     const { data: items } = await supabase
       .from('cart_items')
-      .select('quantity, variant:product_variants(price_override, product:products(base_price))')
+      .select('quantity, variant:product_variants(price_override, price_floor, product:products(base_price, price_floor))')
       .eq('cart_id', cart.id);
 
+    let floorTotal = 0;
     const subtotal = (items || []).reduce((sum, item: any) => {
       const product = Array.isArray(item.variant?.product) ? item.variant.product[0] : item.variant?.product;
       const price = item.variant?.price_override ?? product?.base_price ?? 0;
+      floorTotal += Math.max(Number(item.variant?.price_floor || 0), Number(product?.price_floor || 0)) * item.quantity;
       return sum + Number(price) * item.quantity;
     }, 0);
 
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
     } else {
       discount = coupon.discount_value;
     }
-    discount = Math.min(discount, subtotal);
+    discount = Math.max(0, Math.min(discount, subtotal - floorTotal));
 
     return NextResponse.json({
       valid: true,

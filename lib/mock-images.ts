@@ -2,6 +2,9 @@
  * Temporary, verified Pexels/Unsplash imagery for client demos.
  * The set intentionally contains no real people: only mannequins and textiles.
  * Replace product image URLs through the admin area as real inventory arrives.
+ * Hero source: https://unsplash.com/photos/NLxe33-GgVU
+ * Featured mannequin source: https://www.pexels.com/photo/35027434/
+ * Textile source: https://unsplash.com/photos/0taSQwyJa00
  */
 export const mockImages = {
   hero: 'https://images.unsplash.com/photo-1761549924624-6a00e5dfabb7?auto=format&fit=crop&w=2200&h=1100&q=80',
@@ -44,10 +47,10 @@ export function getMockCategoryImage(slug: string, index = 0) {
 }
 
 /**
- * Keep enabled while presenting the demo catalogue. Disable it once approved
- * inventory photos have been uploaded through the admin area.
+ * Mock images now act only as a fallback. Synced supplier and inventory photos
+ * take priority as soon as they exist.
  */
-export const USE_MOCK_CATALOG_IMAGES = true;
+export const USE_MOCK_CATALOG_IMAGES = false;
 
 export function getDisplayProductImage(key: string, actual?: string | null, offset = 0) {
   return USE_MOCK_CATALOG_IMAGES ? getMockProductImage(key, offset) : actual || getMockProductImage(key, offset);

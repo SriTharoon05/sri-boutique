@@ -8,11 +8,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Size Guide | Sri Boutique',
-  description: 'Find your perfect fit with our size guide for sarees, blouses, kurtis, and lehengas.',
-};
+export const metadata: Metadata = buildPageMetadata('Size Guide', 'Find your best fit using Sri Boutique’s size guide for sarees, blouses, kurtis, and lehengas.', '/size-guide');
 
 const blouseSizes = [
   { size: 'S', bust: '32"', waist: '28"' },

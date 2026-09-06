@@ -1,118 +1,20 @@
 import Link from 'next/link';
-import { Separator } from '@/components/ui/separator';
-import { MapPin } from 'lucide-react';
+import { ArrowUpRight, MapPin } from 'lucide-react';
 import { STORE_ADDRESS } from '@/lib/site';
 
-const footerLinks = {
-  shop: [
-    { label: 'Silk Sarees', href: '/category/silk-sarees' },
-    { label: 'Cotton Sarees', href: '/category/cotton-sarees' },
-    { label: 'Designer Sarees', href: '/category/designer-sarees' },
-    { label: 'Blouses', href: '/category/blouses' },
-  ],
-  support: [
-    { label: 'Shipping Info', href: '/shipping' },
-    { label: 'Returns', href: '/returns' },
-    { label: 'Size Guide', href: '/size-guide' },
-    { label: 'FAQ', href: '/faq' },
-  ],
-  company: [
-    { label: 'About Us', href: '/about' },
-    { label: 'Contact', href: '/contact' },
-    { label: 'Privacy Policy', href: '/privacy' },
-    { label: 'Terms of Service', href: '/terms' },
-  ],
-};
+const support = [['Shipping', '/shipping'], ['Returns', '/returns'], ['Size guide', '/size-guide'], ['FAQs', '/faq']];
+const company = [['Our story', '/about'], ['Contact', '/contact'], ['Privacy', '/privacy'], ['Terms', '/terms']];
 
 export function Footer() {
   return (
-    <footer className="bg-secondary/30 border-t">
-      <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Brand */}
-          <div className="space-y-4">
-            <Link href="/" className="inline-block">
-              <span className="font-display text-xl font-semibold text-primary">
-                Sri Boutique
-              </span>
-            </Link>
-            <p className="text-sm text-muted-foreground max-w-xs">
-              Discover exquisite handcrafted sarees and ethnic wear.
-              Timeless elegance for the modern woman.
-            </p>
-            <address className="not-italic text-sm text-muted-foreground flex gap-2 max-w-xs">
-              <MapPin className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
-              <span>{STORE_ADDRESS}</span>
-            </address>
-          </div>
-
-          {/* Shop */}
-          <div>
-            <h3 className="font-display text-lg font-medium mb-4">Shop</h3>
-            <ul className="space-y-2">
-              {footerLinks.shop.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Support */}
-          <div>
-            <h3 className="font-display text-lg font-medium mb-4">Support</h3>
-            <ul className="space-y-2">
-              {footerLinks.support.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Company */}
-          <div>
-            <h3 className="font-display text-lg font-medium mb-4">Company</h3>
-            <ul className="space-y-2">
-              {footerLinks.company.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+    <footer className="border-t border-foreground/30 bg-foreground text-background">
+      <div className="container mx-auto px-4 py-14 md:py-20">
+        <div className="grid gap-12 md:grid-cols-[1.4fr_.6fr_.6fr]">
+          <div><Link href="/" className="inline-flex items-center gap-3 text-4xl font-black tracking-[-0.08em] md:text-6xl">SRI <span className="-rotate-2 bg-accent px-3 py-2 text-sm tracking-wide text-accent-foreground">BOUTIQUE</span></Link><p className="mt-5 max-w-xl text-lg text-background/70">Indian fashion with a louder point of view. Fresh drops, expressive drapes, and occasion-ready edits curated in Chennai.</p><address className="mt-6 flex max-w-md gap-3 not-italic text-sm text-background/70"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-secondary" /><span>{STORE_ADDRESS}</span></address></div>
+          <div><h3 className="mb-5 text-xs font-black uppercase tracking-[.2em] text-secondary">Need help?</h3><ul className="space-y-3">{support.map(([label, href]) => <li key={href}><Link href={href} className="inline-flex items-center gap-1 text-sm hover:text-accent">{label}<ArrowUpRight className="h-3 w-3" /></Link></li>)}</ul></div>
+          <div><h3 className="mb-5 text-xs font-black uppercase tracking-[.2em] text-secondary">More Sri</h3><ul className="space-y-3">{company.map(([label, href]) => <li key={href}><Link href={href} className="inline-flex items-center gap-1 text-sm hover:text-accent">{label}<ArrowUpRight className="h-3 w-3" /></Link></li>)}</ul></div>
         </div>
-
-        <Separator className="my-8" />
-
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Sri Boutique. All rights reserved.
-          </p>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">Secure Payments</span>
-            <div className="flex items-center gap-2">
-              <div className="h-6 px-2 bg-muted rounded text-xs flex items-center">
-                Razorpay
-              </div>
-            </div>
-          </div>
-        </div>
+        <div className="mt-14 flex flex-col gap-3 border-t border-background/25 pt-6 text-[11px] uppercase tracking-wider text-background/55 sm:flex-row sm:justify-between"><p>© {new Date().getFullYear()} Sri Boutique</p><p>Secure checkout powered by Razorpay · Built for India</p></div>
       </div>
     </footer>
   );

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin-client';
+import { validateDropshipOrderAvailability } from '@/lib/suppliers/orders';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -28,6 +29,12 @@ export async function POST(request: NextRequest) {
     }
     if (order.status !== 'pending' || order.payment_status === 'success') {
       return NextResponse.json({ error: 'This order cannot be paid again' }, { status: 409 });
+    }
+
+    try {
+      await validateDropshipOrderAvailability(orderId);
+    } catch (availabilityError) {
+      return NextResponse.json({ error: availabilityError instanceof Error ? availabilityError.message : 'A supplier item is unavailable' }, { status: 409 });
     }
 
     const key_id = process.env.RAZORPAY_KEY_ID;

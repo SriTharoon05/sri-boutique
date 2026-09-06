@@ -21,7 +21,7 @@ export function SearchDialog() {
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-display">Search the collection</DialogTitle>
+          <DialogTitle className="text-2xl font-black uppercase">Find your next fit</DialogTitle>
         </DialogHeader>
         <form
           className="flex gap-2"
@@ -41,7 +41,7 @@ export function SearchDialog() {
             maxLength={80}
             autoFocus
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search sarees, colours, and styles"
+            placeholder="Search products, colours, and styles"
           />
           <Button type="submit">Search</Button>
         </form>

@@ -6,6 +6,7 @@ import { demoProducts, findDemoCategory } from '@/lib/demo-catalog';
 import type { Product, ProductVariant } from '@/types/database';
 import { absoluteUrl } from '@/lib/site';
 import { getDisplayCategoryImage } from '@/lib/mock-images';
+import { isDemoRecord } from '@/lib/seo';
 
 export const revalidate = 300;
 
@@ -33,11 +34,18 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
     title: resolvedCategory.name,
     description: resolvedCategory.description || `Shop our collection of ${resolvedCategory.name.toLowerCase()} at Sri Boutique.`,
     alternates: { canonical: absoluteUrl(`/category/${resolvedCategory.slug}`) },
+    robots: isDemoRecord(resolvedCategory) ? { index: false, follow: true } : undefined,
     openGraph: {
       title: `${resolvedCategory.name} | Sri Boutique`,
       description: resolvedCategory.description || `Shop our collection of ${resolvedCategory.name.toLowerCase()} at Sri Boutique.`,
       url: absoluteUrl(`/category/${resolvedCategory.slug}`),
       images: [{ url: getDisplayCategoryImage(resolvedCategory.slug, resolvedCategory.image_url) }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${resolvedCategory.name} | Sri Boutique`,
+      description: resolvedCategory.description || `Shop our collection of ${resolvedCategory.name.toLowerCase()} at Sri Boutique.`,
+      images: [getDisplayCategoryImage(resolvedCategory.slug, resolvedCategory.image_url)],
     },
   };
 }
@@ -72,11 +80,17 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
   const filters = await searchParams;
 
-  return (
-    <CategoryPageContent
-      category={resolvedCategory}
-      initialProducts={products}
-      initialFilters={filters}
-    />
-  );
+  const breadcrumbData = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: absoluteUrl('/') },
+      { '@type': 'ListItem', position: 2, name: resolvedCategory.name, item: absoluteUrl(`/category/${resolvedCategory.slug}`) },
+    ],
+  };
+
+  return <>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbData) }} />
+    <CategoryPageContent category={resolvedCategory} initialProducts={products} initialFilters={filters} />
+  </>;
 }

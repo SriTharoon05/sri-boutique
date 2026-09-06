@@ -20,7 +20,7 @@ import {
   DialogTitle,
   DialogClose,
 } from '@/components/ui/dialog';
-import { Loader2, Plus, Pencil, Power, Search } from 'lucide-react';
+import { Loader2, Plus, Pencil, Power, Search, Truck } from 'lucide-react';
 import { Product, Category, ProductVariant } from '@/types/database';
 import { toast } from 'sonner';
 
@@ -236,6 +236,7 @@ export default function AdminProductsPage() {
                   <th className="text-left py-4 px-6 text-sm font-medium">Category</th>
                   <th className="text-left py-4 px-6 text-sm font-medium">Price</th>
                   <th className="text-left py-4 px-6 text-sm font-medium">Variants</th>
+                  <th className="text-left py-4 px-6 text-sm font-medium">Source</th>
                   <th className="text-left py-4 px-6 text-sm font-medium">Status</th>
                   <th className="text-center py-4 px-6 text-sm font-medium">Actions</th>
                 </tr>
@@ -255,13 +256,19 @@ export default function AdminProductsPage() {
                       <Badge variant="outline">{product.variants?.length || 0} variants</Badge>
                     </td>
                     <td className="py-4 px-6">
+                      <Badge variant="outline" className={product.source_type === 'dropship' ? 'border-blue-200 bg-blue-50 text-blue-800' : ''}>
+                        {product.source_type === 'dropship' ? <Truck className="h-3 w-3 mr-1" /> : null}
+                        {product.source_type === 'dropship' ? 'Dropship' : 'Own stock'}
+                      </Badge>
+                    </td>
+                    <td className="py-4 px-6">
                       <Badge className={product.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
                         {product.is_active ? 'Active' : 'Inactive'}
                       </Badge>
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center justify-center gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(product)}>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(product)} disabled={product.source_type === 'dropship'} title={product.source_type === 'dropship' ? 'Supplier products are managed from Suppliers' : 'Edit product'}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button

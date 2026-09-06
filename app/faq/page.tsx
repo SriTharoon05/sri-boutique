@@ -6,11 +6,9 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { buildPageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'FAQ | Sri Boutique',
-  description: 'Frequently asked questions about orders, shipping, returns, and payments at Sri Boutique.',
-};
+export const metadata: Metadata = buildPageMetadata('Frequently Asked Questions', 'Frequently asked questions about orders, shipping, returns, and payments at Sri Boutique.', '/faq');
 
 const faqs = [
   {

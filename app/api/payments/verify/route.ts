@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin-client';
 import crypto from 'crypto';
+import { dispatchDropshipOrder } from '@/lib/suppliers/orders';
 
 export async function POST(request: NextRequest) {
   try {
@@ -127,6 +128,17 @@ export async function POST(request: NextRequest) {
       .select(`*, items:order_items (*)`)
       .eq('id', orderId)
       .single();
+
+    // Supplier submission is idempotent and recorded separately. Payment stays
+    // successful even if a supplier is temporarily unavailable; admins can retry
+    // failed dispatches from the supplier control centre.
+    if (order?.items?.some((item: any) => item.supplier_id)) {
+      try {
+        await dispatchDropshipOrder(orderId);
+      } catch (dispatchError) {
+        console.error('Dropship dispatch queued for retry:', dispatchError);
+      }
+    }
 
     // 8. Send confirmation email via Edge Function — only if we won the
     //    claim above. Best-effort, non-blocking on failure.
