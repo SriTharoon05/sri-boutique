@@ -1,5 +1,4 @@
 'use client';
-import { isPaymentTestCart } from '@/lib/payment-test-product';
 
 export const dynamic = 'force-dynamic';
 import Image from 'next/image';
@@ -96,7 +95,7 @@ export default function CheckoutPage() {
     }
   }, [items, cartLoading, router, paymentCompleted]);
 
-  const shipping = isPaymentTestCart(items) || subtotal > 2000 ? 0 : 99;
+  const shipping = 0;
   const total = subtotal - discount + shipping + (paymentMethod === 'cod' ? paymentOptions.codFee : 0);
   const payNow = paymentMethod === 'cod' ? Math.min(total, paymentOptions.codAdvance) : total;
 
@@ -415,7 +414,7 @@ export default function CheckoutPage() {
                 Pay securely through Razorpay.
                 We accept all major credit cards, debit cards, UPI, and net banking.
               </p>
-              <fieldset className="mt-4 space-y-3" disabled={Boolean(orderId)}><legend className="font-medium mb-2">Payment method</legend><label className="flex gap-2"><input type="radio" name="payment-method" checked={paymentMethod === 'online'} onChange={() => setPaymentMethod('online')} />Pay online</label>{paymentOptions.codAvailable ? <label className="flex gap-2"><input type="radio" name="payment-method" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} />Cash on delivery — ₹{paymentOptions.codAdvance} advance online</label> : <p className="text-sm text-muted-foreground">COD is not currently available for this cart. Please pay online.</p>}</fieldset>
+<fieldset className="mt-4 space-y-3" disabled={Boolean(orderId)}><legend className="font-medium mb-2">Payment method</legend><label className="flex gap-2"><input type="radio" name="payment-method" checked={paymentMethod === 'online'} onChange={() => setPaymentMethod('online')} />Pay online — Free delivery on online payments</label>{paymentOptions.codAvailable ? <label className="flex gap-2"><input type="radio" name="payment-method" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} />Cash on delivery — ₹{paymentOptions.codAdvance} shipping advance online</label> : <p className="text-sm text-muted-foreground">COD is not currently available for this cart. Please pay online.</p>}</fieldset>
               {paymentMethod === 'cod' && <p className="mt-3 text-sm">Pay ₹{payNow} now; ₹{Math.max(0, total-payNow)} is due to the courier. The additional COD charge is ₹{paymentOptions.codFee}. COD remains subject to delivery serviceability confirmation.</p>}
 
               <div className="mt-4 flex flex-wrap gap-2">
@@ -495,7 +494,7 @@ export default function CheckoutPage() {
                 <span>Total</span>
                 <span>₹{total.toLocaleString()}</span>
               </div>
-              {paymentMethod === 'cod' && <div className="mb-4 text-sm space-y-1"><p>COD charge included: ₹{paymentOptions.codFee}</p><p>Advance online: ₹{payNow}</p><p>Balance on delivery: ₹{Math.max(0, total-payNow)}</p></div>}
+              {paymentMethod === 'cod' && <div className="mb-4 text-sm space-y-1"><p>COD shipping charge included: ₹{paymentOptions.codFee}</p><p>Shipping advance online: ₹{payNow}</p><p>Balance on delivery: ₹{Math.max(0, total-payNow)}</p></div>}
 
               <Button
                 size="lg"

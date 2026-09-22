@@ -86,7 +86,7 @@ function productOffer(product: CatalogProduct, variant: CatalogProduct['variants
         ...shippingDetails,
         shippingRate: {
           ...shippingDetails.shippingRate,
-          value: price > 2000 ? 0 : 99,
+          value: 0,
         },
       },
       hasMerchantReturnPolicy: { '@id': merchantReturnPolicy['@id'] },

@@ -1,5 +1,4 @@
 'use client';
-import { isPaymentTestCart } from '@/lib/payment-test-product';
 import { storefrontSlug } from '@/lib/storefront-brand';
 
 export const dynamic = 'force-dynamic';
@@ -68,7 +67,7 @@ export default function CartPage() {
     setCouponCode('');
   };
 
-  const shipping = isPaymentTestCart(items) || subtotal > 2000 ? 0 : 99;
+  const shipping = 0;
   const total = subtotal - discount + shipping;
 
   if (loading) {
@@ -305,7 +304,7 @@ export default function CartPage() {
                 </Button>
 
                 <p className="text-xs text-muted-foreground text-center mt-4">
-                  Free shipping on orders above ₹2,000
+                  Free delivery on online payments. COD shipping is paid in advance where available.
                 </p>
               </Card>
             </div>

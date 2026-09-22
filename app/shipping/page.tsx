@@ -30,9 +30,10 @@ export default function ShippingPage() {
               Shipping Charges
             </h2>
             <p>
-              We offer <strong>free shipping</strong> on all orders above
-              ₹2,000. For orders at or below this amount, a flat shipping charge of
-              ₹99 applies at checkout.
+              We offer <strong>free delivery on online payments</strong>, with no
+              minimum order value. Where COD is available, pay ₹100 online in
+              advance for shipping and the remaining balance on delivery. The
+              shipping advance is included in the displayed total, not charged twice.
             </p>
           </section>
 
