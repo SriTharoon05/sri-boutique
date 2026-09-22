@@ -1,13 +1,15 @@
 import { ImageResponse } from 'next/og';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
 export const dynamic = 'force-static';
 
-export function GET() {
+export async function GET() {
+  const logo = await readFile(path.join(process.cwd(), 'public/images/sri-boutique-wordmark.png'));
   return new ImageResponse(
     <div style={{ display: 'flex', width: '100%', height: '100%', background: '#f8f5ef', color: '#283e35', padding: 76, flexDirection: 'column', justifyContent: 'space-between' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-        <span style={{ fontSize: 62, fontWeight: 700 }}>SRI</span>
-        <span style={{ fontSize: 28, padding: '12px 20px', background: '#d5e1d6', letterSpacing: 4 }}>BOUTIQUE</span>
+        <img src={`data:image/png;base64,${logo.toString('base64')}`} width={220} height={172} alt="Sri Boutique" />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <span style={{ fontSize: 88, letterSpacing: -4 }}>Style, your way.</span>

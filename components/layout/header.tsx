@@ -1,5 +1,6 @@
 'use client';
 import { storefrontSlug } from '@/lib/storefront-brand';
+import { BrandLogo } from '@/components/brand-logo';
 import { groupCategories } from '@/lib/category-groups';
 
 import { useEffect, useState } from 'react';
@@ -52,10 +53,9 @@ export function Header() {
         </div>
       </div>
 
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
+      <div className="container mx-auto flex h-20 items-center justify-between px-4">
         <Link href="/" aria-label="Sri Boutique home" className="group inline-flex items-center gap-2.5 leading-none">
-          <span className="text-2xl font-black tracking-[-0.08em] sm:text-3xl">SRI</span>
-          <span className="-rotate-2 bg-accent px-2.5 py-1.5 text-[11px] font-black uppercase tracking-wide text-accent-foreground transition-transform group-hover:rotate-0 sm:px-3 sm:text-xs">Boutique</span>
+          <BrandLogo className="w-[90px]" priority />
         </Link>
 
         <div className="flex items-center gap-1 sm:gap-2">

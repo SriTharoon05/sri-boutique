@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { isDeepStrictEqual } from 'node:util';
 import { createAdminClient } from '@/lib/supabase/admin-client';
 import { calculateProtectedPrice } from './pricing';
+import { excludedFromWomensCatalogue } from '@/lib/womens-catalogue';
 import { getSheScaleClient } from './shescale';
 import type { NormalizedSupplierProduct, SupplierSettings } from './types';
 
@@ -37,6 +38,11 @@ async function upsertCategory(db: any, supplier: SupplierSettings, product: Norm
 }
 
 async function upsertProduct(db: any, supplier: SupplierSettings, item: NormalizedSupplierProduct, cached?: any) {
+  if (excludedFromWomensCatalogue(item.name, item.raw)) {
+    const { error } = await db.from('products').update({ is_active: false }).eq('supplier_id', supplier.id).eq('supplier_product_id', item.externalId);
+    if (error) throw error;
+    return 0;
+  }
   const highestVariantCost = Math.max(item.cost, ...item.variants.map((variant) => variant.cost || item.cost));
   const pricing = calculateProtectedPrice(highestVariantCost, supplier);
   const now = new Date().toISOString();

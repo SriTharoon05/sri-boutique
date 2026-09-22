@@ -1,5 +1,6 @@
 // app/auth/login/page.tsx
 'use client';
+import { BrandLogo } from '@/components/brand-logo';
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -83,9 +84,7 @@ export default function LoginPage() {
         className="w-full max-w-sm"
       >
         <div className="text-center mb-8">
-          <span className="text-xs font-medium tracking-widest text-primary mb-3 block">
-            SRI BOUTIQUE
-          </span>
+          <BrandLogo className="mx-auto mb-5 w-36" priority />
           <h1 className="font-display text-3xl font-medium text-foreground mb-2">
             Welcome Back
           </h1>

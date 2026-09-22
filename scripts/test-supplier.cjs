@@ -36,6 +36,12 @@ async function main() {
   assert.equal(calculateProtectedPrice(1000, { ...settings, config: { markup_percent: 0 } }).sellingPrice, 1000);
   assert.throws(() => calculateProtectedPrice(1000, { ...settings, config: { markup_percent: -1 } }));
   const { groupCategories } = load('lib/category-groups.ts');
+  const { excludedFromWomensCatalogue } = load('lib/womens-catalogue.ts');
+  assert.equal(excludedFromWomensCatalogue('Flex Cotton Embroidered Kurta Set', { gender: 'MEN' }), true);
+  assert.equal(excludedFromWomensCatalogue('Cotton Hoodie', { gender: 'UNISEX' }), true);
+  assert.equal(excludedFromWomensCatalogue("Men’s Shirt"), true);
+  assert.equal(excludedFromWomensCatalogue("Women's Cotton Kurta", { gender: 'WOMEN' }), false);
+  assert.equal(excludedFromWomensCatalogue('Cotton Regular Fit T-Shirt', { gender: 'WOMEN' }), false);
   const grouped = groupCategories(['Gown', 'Gowns', 'Kurta', 'Kurtis', 'Women Clothing Kurta Set', 'Co Ord Sets', 'Co-ord Sets'].map((name, i) => ({ id: String(i), name, slug: String(i) })));
   assert.equal(grouped.length, 3);
   assert.equal(grouped.find(c => c.slug === 'dresses-gowns').categoryIds.length, 2);

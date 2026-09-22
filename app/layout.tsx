@@ -32,6 +32,7 @@ const cormorant = localFont({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   applicationName: SITE_NAME,
+  icons: { icon: '/images/sri-boutique-wordmark.png', apple: '/images/sri-boutique-wordmark.png' },
   title: {
     default: 'Sri Boutique | Sarees & Indian Fashion, Remixed',
     template: '%s | Sri Boutique',
