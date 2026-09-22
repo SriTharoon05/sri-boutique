@@ -32,7 +32,14 @@ async function main() {
   assert.equal(calculateProtectedPrice(1000, settings).priceFloor, 1250);
   assert.equal(calculateProtectedPrice(1000, { ...settings, config: { markup_percent: 40 } }).sellingPrice, 1400);
   assert.equal(calculateProtectedPrice(1000, { ...settings, return_cost_buffer: 500 }).sellingPrice, 1500);
-  assert.throws(() => calculateProtectedPrice(1000, { ...settings, config: { markup_percent: 20 } }));
-  console.log('Supplier catalogue, authentication separation, stock, images, pagination and pricing tests passed.');
+  assert.equal(calculateProtectedPrice(1000, { ...settings, config: { markup_percent: 20 } }).sellingPrice, 1200);
+  assert.equal(calculateProtectedPrice(1000, { ...settings, config: { markup_percent: 0 } }).sellingPrice, 1000);
+  assert.throws(() => calculateProtectedPrice(1000, { ...settings, config: { markup_percent: -1 } }));
+  const { groupCategories } = load('lib/category-groups.ts');
+  const grouped = groupCategories(['Gown', 'Gowns', 'Kurta', 'Kurtis', 'Women Clothing Kurta Set', 'Co Ord Sets', 'Co-ord Sets'].map((name, i) => ({ id: String(i), name, slug: String(i) })));
+  assert.equal(grouped.length, 3);
+  assert.equal(grouped.find(c => c.slug === 'dresses-gowns').categoryIds.length, 2);
+  assert.equal(grouped.find(c => c.slug === 'kurtas-suit-sets').categoryIds.length, 3);
+  console.log('Supplier catalogue, category grouping, authentication separation, stock, images, pagination and pricing tests passed.');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

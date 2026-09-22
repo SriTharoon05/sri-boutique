@@ -1,5 +1,6 @@
 'use client';
 import { storefrontSlug } from '@/lib/storefront-brand';
+import { groupCategories } from '@/lib/category-groups';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -29,7 +30,7 @@ export function Header() {
     async function loadCategories() {
       const supplierCategories = await supabase.from('categories').select('id, name, slug').not('supplier_id', 'is', null).order('name');
       const result = supplierCategories.data?.length ? supplierCategories : await supabase.from('categories').select('id, name, slug').is('parent_id', null).order('name').limit(50);
-      if (active && !result.error) setNavigationCategories((result.data || []) as NavigationCategory[]);
+      if (active && !result.error) setNavigationCategories(groupCategories((result.data || []) as NavigationCategory[]));
     }
     void loadCategories();
     window.addEventListener('catalog-updated', loadCategories);

@@ -379,7 +379,7 @@ export function CategoryPageContent({ category, initialProducts, initialFilters 
                                 </div>
                               )}
 
-                              {(variant?.stock_quantity === 0 || (product.source_type === 'dropship' && quota.blocked)) && (
+                              {(variant?.stock_quantity === 0 || (product.source_type === 'dropship' && quota.blocked && !quota.loading)) && (
                                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                                   <span className="text-white font-medium">Out of Stock</span>
                                 </div>

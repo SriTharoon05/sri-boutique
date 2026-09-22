@@ -1,15 +1,28 @@
 import { catalogSlugCandidates, categoryDescription } from '@/lib/storefront-brand';
+import { groupCategories, categoryGroup } from '@/lib/category-groups';
+import { cache } from 'react';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { createPublicClient } from '@/lib/supabase/public';
 import { CategoryPageContent } from './category-content';
 import { demoProducts, findDemoCategory } from '@/lib/demo-catalog';
-import type { Product, ProductVariant } from '@/types/database';
+import type { Category, Product, ProductVariant } from '@/types/database';
 import { absoluteUrl } from '@/lib/site';
 import { getDisplayCategoryImage } from '@/lib/mock-images';
 import { isDemoRecord } from '@/lib/seo';
 
 export const revalidate = 300;
+
+const resolveCategory = cache(async (slug: string) => {
+  const db = createPublicClient();
+  if (!db) return null;
+  const { data, error } = await db.from('categories').select('*').order('name');
+  if (error) throw error;
+  const categories = (data || []) as Category[];
+  const original = categories.find(c => catalogSlugCandidates(slug).includes(c.slug));
+  const key = original ? categoryGroup(original.name).slug : slug;
+  return groupCategories(categories).find(c => c.slug === key) || null;
+});
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;
@@ -20,9 +33,7 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   const { slug } = await params;
   const supabase = createPublicClient();
 
-  const { data: category } = supabase
-    ? await supabase.from('categories').select('*').in('slug', catalogSlugCandidates(slug)).maybeSingle()
-    : { data: null };
+  const category = await resolveCategory(slug);
   const resolvedCategory = category || findDemoCategory(slug);
 
   if (!resolvedCategory) {
@@ -55,9 +66,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const { slug } = await params;
   const supabase = createPublicClient();
 
-  const { data: category } = supabase
-    ? await supabase.from('categories').select('*').in('slug', catalogSlugCandidates(slug)).maybeSingle()
-    : { data: null };
+  const category = await resolveCategory(slug);
   const resolvedCategory = category || findDemoCategory(slug);
 
   if (!resolvedCategory) {
@@ -68,7 +77,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     ? await supabase
         .from('products')
         .select('*, variants:product_variants (*)')
-        .eq('category_id', category.id)
+        .in('category_id', category.categoryIds)
         .eq('is_active', true)
     : { data: null };
 

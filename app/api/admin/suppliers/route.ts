@@ -18,7 +18,7 @@ const settingsSchema = z.object({
   tax_reserve_percent: z.number().min(0).max(49),
   price_rounding: z.number().int().min(1).max(1000),
   max_sync_pages: z.number().int().min(1).max(250),
-  markup_percent: z.number().min(25).max(500).default(25),
+  markup_percent: z.number().min(0).max(500).default(25),
   refresh_seconds: z.number().int().min(15).max(3600).default(15),
   cod_enabled: z.boolean().default(false),
   cod_advance: z.number().min(1).max(10000).default(100),

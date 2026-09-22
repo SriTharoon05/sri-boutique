@@ -355,7 +355,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
                   </button>
                 </div>
                 <span className="text-sm text-muted-foreground">
-                  {vendorBlocked ? 'Unavailable today' : product.source_type === 'dropship' ? 'Availability checked at checkout' : `${selectedVariant?.stock_quantity || 0} available`}
+                  {vendorBlocked ? quota.message : product.source_type === 'dropship' ? 'Availability checked at checkout' : `${selectedVariant?.stock_quantity || 0} available`}
                 </span>
               </div>
             </div>

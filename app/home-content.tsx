@@ -86,7 +86,7 @@ export function HomePageContent({ categories, products }: HomePageContentProps) 
               const price = variant?.price_override ?? product.base_price;
               const compareAt = product.compare_at_price;
               const image = getDisplayProductImage(product.slug, variant?.image_urls?.[0], index);
-              const fulfilment = product.source_type === 'dropship' ? (quota.blocked ? 'Unavailable today' : 'Available') : (variant?.stock_quantity || 0) > 0 ? 'Ready to ship' : 'Preview';
+              const fulfilment = product.source_type === 'dropship' ? (quota.loading ? 'Checking availability…' : quota.blocked ? 'Ordering unavailable' : 'Available') : (variant?.stock_quantity || 0) > 0 ? 'Ready to ship' : 'Preview';
               return <motion.article key={product.id} {...reveal} transition={{ duration: .45, delay: index * .06 }} className="group">
                 <Link href={`/product/${storefrontSlug(product.slug)}`} className="block">
                   <div className="relative aspect-[3/4] overflow-hidden border border-border bg-muted"><Image src={image} alt={product.name} fill sizes="(max-width: 768px) 50vw, 25vw" className="object-cover saturate-[.9] transition duration-500 group-hover:scale-[1.04] group-hover:saturate-100" /><span className={`absolute left-2 top-2 px-2 py-1 text-[9px] font-bold uppercase tracking-wider ${index % 2 ? 'bg-secondary' : 'bg-accent'}`}>{index === 0 ? 'New' : fulfilment}</span><span className="absolute inset-x-3 bottom-3 translate-y-3 bg-foreground/90 py-3 text-center text-xs font-bold text-background opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">View details</span></div>

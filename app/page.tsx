@@ -1,5 +1,7 @@
 import { MainLayout } from '@/components/layout/main-layout';
-import { HomePageContent } from './home-content';
+import { groupCategories } from '@/lib/category-groups';
+import { HomepageEditor } from '@/components/homepage-editor';
+import { homepageSchema, defaultHomepageSettings } from '@/lib/homepage-settings';
 import { createPublicClient } from '@/lib/supabase/public';
 import { demoCategories, demoProducts, type CatalogProduct } from '@/lib/demo-catalog';
 import type { Category } from '@/types/database';
@@ -20,10 +22,12 @@ export default async function HomePage() {
   const supabase = createPublicClient();
   let categories = demoCategories as (Category & { _count?: number })[];
   let products = demoProducts;
+  let settings = defaultHomepageSettings;
+  let selectedProducts: CatalogProduct[] = [];
 
   if (supabase) {
     const [{ data: categoryData }, { data: productData }] = await Promise.all([
-      supabase.from('categories').select('*').is('parent_id', null).order('synced_at', { ascending: false, nullsFirst: false }).limit(4),
+      supabase.from('categories').select('*').is('parent_id', null).order('name'),
       supabase
         .from('products')
         .select('*, category:categories (*), variants:product_variants (*)')
@@ -32,13 +36,21 @@ export default async function HomePage() {
         .limit(4),
     ]);
 
-    if (categoryData?.length) categories = categoryData;
+    if (categoryData?.length) categories = groupCategories(categoryData as Category[]).slice(0, 4);
     if (productData?.length) products = productData as CatalogProduct[];
+    const { data: saved } = await supabase.from('homepage_settings').select('settings').eq('id', true).maybeSingle();
+    const parsed = homepageSchema.safeParse(saved?.settings);
+    if (parsed.success) settings = parsed.data;
+    const ids = Array.from(new Set([...Object.values(settings.covers), ...settings.featured].map(p => p.productId)));
+    if (ids.length) {
+      const { data } = await supabase.from('products').select('*, category:categories(*), variants:product_variants(*)').eq('is_active', true).in('id', ids);
+      selectedProducts = (data || []) as CatalogProduct[];
+    }
   }
 
   return (
     <MainLayout>
-      <HomePageContent categories={categories} products={products} />
+      <HomepageEditor categories={categories} products={products} initialSettings={settings} selectedProducts={selectedProducts} />
     </MainLayout>
   );
 }

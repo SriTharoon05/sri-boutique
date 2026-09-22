@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin-client';
 import { syncSupplierCatalog } from '@/lib/suppliers/sync';
 import { getVendorDailyQuota } from '@/lib/suppliers/daily-quota';
+import { groupCategories } from '@/lib/category-groups';
 
 export const maxDuration = 300;
 
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     if (productError) throw productError;
     const quota = await getVendorDailyQuota();
     const visibleProducts = (products || []).map((product: any) => ({ ...product, variants: product.variants.map((v: any) => ({ ...v, stock_quantity: quota.ready && quota.remaining > 0 ? v.stock_quantity : 0 })) }));
-    return NextResponse.json({ products: supplier.enabled ? visibleProducts : [], quota, categories: supplier.enabled ? categories : [], total: supplier.enabled ? count : 0, page, limit, refreshSeconds, revision: status?.last_sync_at, stale: status?.last_sync_status !== 'success' }, { headers: { 'Cache-Control': 'no-store' } });
+return NextResponse.json({ products: supplier.enabled ? visibleProducts : [], quota, categories: supplier.enabled ? groupCategories(categories || []) : [], total: supplier.enabled ? count : 0, page, limit, refreshSeconds, revision: status?.last_sync_at, stale: status?.last_sync_status !== 'success' }, { headers: { 'Cache-Control': 'no-store' } });
   } catch {
     return NextResponse.json({ error: 'Catalogue temporarily unavailable' }, { status: 503, headers: { 'Retry-After': '30' } });
   }

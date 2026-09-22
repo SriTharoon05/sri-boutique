@@ -1,4 +1,6 @@
 import { storefrontSlug } from '@/lib/storefront-brand';
+import { groupCategories } from '@/lib/category-groups';
+import type { Category } from '@/types/database';
 import { PAYMENT_TEST_PRODUCT_ID } from '@/lib/payment-test-product';
 import { MetadataRoute } from 'next';
 import { createPublicClient } from '@/lib/supabase/public';
@@ -58,9 +60,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Get all categories
     const { data: categories } = await supabase
       .from('categories')
-      .select('slug, created_at, synced_at');
+      .select('id, name, slug, created_at, synced_at');
 
-    const sitemapCategories = categories?.length ? categories : includeDemoCatalogue ? demoCategories : [];
+    const sitemapCategories = categories?.length ? groupCategories(categories as Category[]) : includeDemoCatalogue ? demoCategories : [];
     const categoryPages: MetadataRoute.Sitemap = sitemapCategories.map((category: { slug: string; created_at: string; synced_at?: string | null }) => ({
       url: `${baseUrl}/category/${storefrontSlug(category.slug)}`,
       lastModified: new Date(category.synced_at || category.created_at),
