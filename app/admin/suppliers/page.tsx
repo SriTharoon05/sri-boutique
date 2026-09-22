@@ -15,7 +15,7 @@ import type { SupplierSettings } from '@/lib/suppliers/types';
 import { AlertTriangle, CheckCircle2, KeyRound, Loader2, Package, PlugZap, RefreshCw, Save, ShieldCheck, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 
-type SupplierView = SupplierSettings & { apiKeyConfigured: boolean };
+type SupplierView = SupplierSettings & { apiKeyConfigured: boolean; markup_percent: number; refresh_seconds: number; cod_enabled: boolean; cod_advance: number; cod_fee: number };
 type CatalogMode = 'dropship' | 'hybrid' | 'inventory';
 type Activity = { id: string; order_id?: string; status: string; started_at?: string; created_at?: string; products_upserted?: number; variants_upserted?: number; last_error?: string; order?: { order_number?: string } };
 
@@ -37,6 +37,18 @@ export default function SupplierSettingsPage() {
   const [exampleCost, setExampleCost] = useState(1000);
   const [catalogMode, setCatalogMode] = useState<CatalogMode>('dropship');
   const [checkoutEnabled, setCheckoutEnabled] = useState(true);
+  const [replacementToken, setReplacementToken] = useState('');
+  async function saveToken() {
+    setBusy('token');
+    try {
+      const response = await fetch('/api/admin/suppliers/token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: replacementToken }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      setReplacementToken('');
+      toast.success('Token saved securely. Product detail checks will use it immediately.');
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Could not save token'); }
+    finally { setBusy(null); }
+  }
   const active = suppliers[0];
 
   const load = useCallback(async () => {
@@ -54,8 +66,11 @@ export default function SupplierSettingsPage() {
     load().catch((error) => toast.error(error.message)).finally(() => setLoading(false));
   }, [load]);
 
-  const preview = useMemo(() => active ? calculateProtectedPrice(exampleCost, active) : null, [active, exampleCost]);
-  const update = (key: keyof SupplierSettings, value: unknown) => setSuppliers((current) => current.map((supplier, index) => index === 0 ? { ...supplier, [key]: value } : supplier));
+  const preview = useMemo(() => {
+    try { return active ? calculateProtectedPrice(exampleCost, { ...active, config: { ...active.config, markup_percent: active.markup_percent } }) : null; }
+    catch { return null; }
+  }, [active, exampleCost]);
+  const update = (key: keyof SupplierView, value: unknown) => setSuppliers((current) => current.map((supplier, index) => index === 0 ? { ...supplier, [key]: value } : supplier));
 
   const perform = async (action: 'save' | 'test' | 'sync' | 'full-sync') => {
     if (!active) return;
@@ -105,11 +120,11 @@ export default function SupplierSettingsPage() {
           </div>
           <Badge className={active.apiKeyConfigured ? 'bg-emerald-100 text-emerald-800 w-fit' : 'bg-amber-100 text-amber-900 w-fit'}>
             {active.apiKeyConfigured ? <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> : <KeyRound className="h-3.5 w-3.5 mr-1" />}
-            {active.apiKeyConfigured ? 'API key configured' : 'API key required'}
+            {active.apiKeyConfigured ? 'Partner key configured' : 'Public catalogue: no key needed'}
           </Badge>
         </div>
 
-        {!active.apiKeyConfigured && <Alert className="mb-6 border-amber-300 bg-amber-50"><KeyRound className="h-4 w-4" /><AlertTitle>Connect SheScale when your key arrives</AlertTitle><AlertDescription>Add <code>SHESCALE_API_KEY=sk_live_…</code> to the hosting environment and redeploy. The key is never sent to this page or saved in the database.</AlertDescription></Alert>}
+        <Alert className="mb-6"><KeyRound className="h-4 w-4" /><AlertTitle>Public catalogue is available without a key</AlertTitle><AlertDescription>For authenticated product checks, set SHESCALE_ACCESS_TOKEN in your server environment. Partner order submission separately requires SHESCALE_API_KEY. Never paste credentials into product settings.</AlertDescription></Alert>
 
         <Tabs defaultValue="connection">
           <TabsList className="w-full h-auto grid grid-cols-3 mb-6">
@@ -119,6 +134,14 @@ export default function SupplierSettingsPage() {
           </TabsList>
 
           <TabsContent value="connection" className="space-y-5">
+            <Button variant="outline" disabled={Boolean(busy)} onClick={async () => {
+              setBusy('test-token');
+              try { const response = await fetch('/api/admin/suppliers/token', { cache: 'no-store' }); const result = await response.json(); if (!response.ok) throw new Error(result.error); toast.success('Authenticated product access works'); }
+              catch (error) { toast.error(error instanceof Error ? error.message : 'Token check failed'); }
+              finally { setBusy(null); }
+            }}>Test saved product token</Button>
+            <Card className="p-5 space-y-3"><Label htmlFor="cod-enabled">Offer COD for eligible single-product orders</Label><Switch id="cod-enabled" checked={active.cod_enabled} onCheckedChange={v => update('cod_enabled', v)} /><p className="text-sm text-muted-foreground">Enable only after checking SheScale serviceability and testing advance/balance settlement. The customer pays the advance to your Razorpay; you pay SheScale separately.</p><Label htmlFor="cod-advance">Advance collected online (₹)</Label><Input id="cod-advance" type="number" min="1" value={active.cod_advance} onChange={e => update('cod_advance', Number(e.target.value))} /><Label htmlFor="cod-fee">Additional COD charge (₹)</Label><Input id="cod-fee" type="number" min="0" value={active.cod_fee} onChange={e => update('cod_fee', Number(e.target.value))} /><Button onClick={() => perform('save')} disabled={Boolean(busy)}>Save payment settings</Button></Card>
+            <Card className="p-5 space-y-3"><h2 className="font-semibold">Manual fulfilment · SheScale access token</h2><p className="text-sm text-muted-foreground">Customer payments go to your Razorpay account. Place supplier orders manually using the paid order details in Admin → Orders. No automatic SheScale order is submitted.</p><Label htmlFor="supplier-token">Replace product-read bearer token</Label><Input id="supplier-token" type="password" autoComplete="new-password" value={replacementToken} onChange={event => setReplacementToken(event.target.value)} placeholder="Paste a replacement token" /><Button onClick={saveToken} disabled={Boolean(busy) || !replacementToken.trim()}>Save token securely</Button><p className="text-xs text-muted-foreground">Stored encrypted in Vault; never returned to the browser. Saving does not confirm validity—check a product afterwards.</p></Card>
             <div className="grid md:grid-cols-3 gap-4">
               {[
                 { key: 'enabled' as const, title: 'Supplier enabled', text: 'Allows synced products and order dispatch.' },
@@ -141,17 +164,19 @@ export default function SupplierSettingsPage() {
               </div>
               <div className="flex flex-wrap gap-3 mt-6">
                 <Button onClick={() => perform('save')} disabled={Boolean(busy)}>{busy === 'save' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}Save settings</Button>
-                <Button variant="outline" onClick={() => perform('test')} disabled={Boolean(busy) || !active.apiKeyConfigured}><PlugZap className="h-4 w-4 mr-2" />Test connection</Button>
-                <Button variant="outline" onClick={() => perform('sync')} disabled={Boolean(busy) || !active.apiKeyConfigured || !active.enabled || !active.sync_enabled}>{busy === 'sync' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Package className="h-4 w-4 mr-2" />}Sync changes</Button>
-                <Button variant="ghost" onClick={() => perform('full-sync')} disabled={Boolean(busy) || !active.apiKeyConfigured || !active.enabled || !active.sync_enabled}><RefreshCw className="h-4 w-4 mr-2" />Full sync</Button>
+                <Button variant="outline" onClick={() => perform('test')} disabled={Boolean(busy)}><PlugZap className="h-4 w-4 mr-2" />Test public catalogue</Button>
+                <Button variant="outline" onClick={() => perform('sync')} disabled={Boolean(busy) || !active.enabled || !active.sync_enabled}>{busy === 'sync' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Package className="h-4 w-4 mr-2" />}Sync catalogue</Button>
+                <Button variant="ghost" onClick={() => perform('full-sync')} disabled={Boolean(busy) || !active.enabled || !active.sync_enabled}><RefreshCw className="h-4 w-4 mr-2" />Full sync</Button>
               </div>
             </Card>
           </TabsContent>
 
           <TabsContent value="pricing" className="space-y-5">
-            <Alert className="border-emerald-200 bg-emerald-50"><ShieldCheck className="h-4 w-4" /><AlertTitle>Protected pricing</AlertTitle><AlertDescription>Customer prices use the higher of your target-margin price and absolute minimum-profit floor. Checkout also caps coupon discounts at this protected floor.</AlertDescription></Alert>
+            <Alert className="border-emerald-200 bg-emerald-50"><ShieldCheck className="h-4 w-4" /><AlertTitle>Protected pricing</AlertTitle><AlertDescription>SheScale prices use the higher of your minimum markup and cost-reserve floor. The legacy target-margin field applies to other adapters. Coupons cannot reduce below this floor. Reserves estimate risk; they cannot guarantee profit on every return.</AlertDescription></Alert>
             <div className="grid lg:grid-cols-[1fr_340px] gap-5">
               <Card className="p-5 md:p-6 grid sm:grid-cols-2 gap-5">
+                <div><Label htmlFor="markup_percent">Minimum markup above supplier cost (%)</Label><Input id="markup_percent" type="number" min="25" max="500" value={active.markup_percent} onChange={event => update('markup_percent', Number(event.target.value))} /><p className="text-xs text-muted-foreground">25% means ₹1,000 becomes at least ₹1,250. Cost reserves can raise this further. Applies on the next sync.</p></div>
+                <div><Label htmlFor="refresh_seconds">Refresh interval (seconds)</Label><Input id="refresh_seconds" type="number" min="15" max="3600" value={active.refresh_seconds} onChange={event => update('refresh_seconds', Number(event.target.value))} /><p className="text-xs text-muted-foreground">Minimum 15 seconds; running imports finish before another starts.</p></div>
                 {numericFields.map((field) => <div key={field.key}><Label htmlFor={field.key}>{field.label}{String(field.key).includes('percent') ? ' (%)' : ' (₹)'}</Label><Input id={field.key} type="number" min="0" step={field.step || '1'} value={Number(active[field.key])} onChange={(event) => update(field.key, Number(event.target.value))} className="mt-2" /><p className="text-xs text-muted-foreground mt-1.5">{field.hint}</p></div>)}
                 <div><Label htmlFor="price_rounding">Round prices up to</Label><Input id="price_rounding" type="number" min="1" max="1000" value={active.price_rounding} onChange={(event) => update('price_rounding', Number(event.target.value))} className="mt-2" /></div>
                 <div className="sm:col-span-2"><Button onClick={() => perform('save')} disabled={Boolean(busy)}><Save className="h-4 w-4 mr-2" />Save profit rules</Button></div>

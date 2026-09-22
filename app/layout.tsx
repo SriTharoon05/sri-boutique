@@ -45,11 +45,13 @@ export const metadata: Metadata = {
     locale: 'en_IN',
     url: SITE_URL,
     siteName: 'Sri Boutique',
+    images: [{ url: '/social-card', width: 1200, height: 630, alt: 'Sri Boutique — style, your way.' }],
     title: 'Sri Boutique | Sarees & Indian Fashion, Remixed',
     description: 'Statement sarees and fresh Indian fashion edits, curated in Chennai and delivered across India.',
   },
   twitter: {
     card: 'summary_large_image',
+    images: ['/social-card'],
     title: 'Sri Boutique | Sarees & Indian Fashion, Remixed',
     description: 'Statement sarees and fresh Indian fashion edits, curated in Chennai and delivered across India.',
   },
@@ -72,7 +74,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#49253b',
+  themeColor: '#f8f5ef',
 };
 
 const localBusinessSchema = {

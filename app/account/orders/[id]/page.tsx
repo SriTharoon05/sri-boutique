@@ -131,6 +131,7 @@ export default function OrderDetailPage() {
         show={showSuccessOverlay}
         onClose={() => setShowSuccessOverlay(false)}
         orderNumber={order.order_number}
+        codBalance={order.payment_method === 'cod' ? order.cod_balance : undefined}
       />
 
       <div className="container mx-auto px-4 py-12">
@@ -301,7 +302,8 @@ export default function OrderDetailPage() {
 
               <div className="space-y-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Payment Status</p>
+                  <p className="text-sm text-muted-foreground">{order.payment_method === 'cod' ? 'COD advance payment status' : 'Payment Status'}</p>
+                  {order.payment_method === 'cod' && <p className="text-sm mt-2">Online advance: ₹{order.amount_due_now}. Balance on delivery: ₹{order.cod_balance}. COD charge included: ₹{order.cod_fee}.</p>}
                   <Badge className={`mt-1 ${statusColors[order.payment_status]}`}>
                     {order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
                   </Badge>

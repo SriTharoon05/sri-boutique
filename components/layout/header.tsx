@@ -1,4 +1,5 @@
 'use client';
+import { storefrontSlug } from '@/lib/storefront-brand';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -26,15 +27,17 @@ export function Header() {
     let active = true;
     const supabase = createClient();
     async function loadCategories() {
-      const result = await supabase.from('categories').select('id, name, slug').is('parent_id', null).order('name').limit(50);
+      const supplierCategories = await supabase.from('categories').select('id, name, slug').not('supplier_id', 'is', null).order('name');
+      const result = supplierCategories.data?.length ? supplierCategories : await supabase.from('categories').select('id, name, slug').is('parent_id', null).order('name').limit(50);
       if (active && !result.error) setNavigationCategories((result.data || []) as NavigationCategory[]);
     }
     void loadCategories();
-    return () => { active = false; };
+    window.addEventListener('catalog-updated', loadCategories);
+    return () => { active = false; window.removeEventListener('catalog-updated', loadCategories); };
   }, []);
 
   const navLinks = navigationCategories.length
-    ? navigationCategories.map((category) => ({ href: `/category/${category.slug}`, label: category.name }))
+    ? navigationCategories.map((category) => ({ href: `/category/${storefrontSlug(category.slug)}`, label: category.name }))
     : [{ href: '/#categories', label: 'Shop all' }];
   const desktopLinks = navLinks.slice(0, 6);
   const overflowLinks = navLinks.slice(6);

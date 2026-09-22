@@ -274,6 +274,11 @@ export interface Database {
       };
       orders: {
         Row: {
+          payment_method?: 'online' | 'cod';
+          amount_due_now?: number | null;
+          cod_balance?: number;
+          cod_fee?: number;
+          supplier_reference?: string | null;
           id: string;
           user_id: string | null;
           order_number: string;

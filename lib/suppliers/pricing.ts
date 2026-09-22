@@ -19,7 +19,10 @@ export function calculateProtectedPrice(sourceCost: number, settings: SupplierSe
 
   const targetMarginPrice = (sourceCost + fixedBuffers) / (1 - operationalRate - targetRate);
   const absoluteProfitFloor = (sourceCost + fixedBuffers + Number(settings.minimum_profit)) / (1 - operationalRate);
-  const rawPrice = Math.max(targetMarginPrice, absoluteProfitFloor);
+  const markup = Number(settings.config?.markup_percent ?? 25);
+  if (!Number.isFinite(markup) || markup < 25 || markup > 500) throw new Error('Markup must be between 25% and 500%');
+  const markupPrice = sourceCost * (1 + markup / 100);
+  const rawPrice = Math.max(settings.code === 'shescale' ? markupPrice : targetMarginPrice, absoluteProfitFloor);
   const rounding = Math.max(1, Number(settings.price_rounding));
   const sellingPrice = Math.ceil(rawPrice / rounding) * rounding;
   const feesAndTax = sellingPrice * operationalRate;
@@ -27,9 +30,8 @@ export function calculateProtectedPrice(sourceCost: number, settings: SupplierSe
 
   return {
     sellingPrice: money(sellingPrice),
-    priceFloor: money(absoluteProfitFloor),
+    priceFloor: money(settings.code === 'shescale' ? Math.max(markupPrice, absoluteProfitFloor) : absoluteProfitFloor),
     estimatedProfit: money(estimatedProfit),
     totalFixedCost: money(sourceCost + fixedBuffers),
   };
 }
-

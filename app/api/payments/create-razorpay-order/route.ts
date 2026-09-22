@@ -2,14 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin-client';
 import { validateDropshipOrderAvailability } from '@/lib/suppliers/orders';
+import { paymentAmountInPaise, razorpayClient } from '@/lib/razorpay';
+
+export const runtime = 'nodejs';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(request: NextRequest) {
   try {
-    const { orderId } = await request.json();
+    const body = await request.json().catch(() => null);
+    const orderId = body?.orderId;
 
-    if (!orderId || !UUID_REGEX.test(orderId)) {
+    if (typeof orderId !== 'string' || !UUID_REGEX.test(orderId)) {
       return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
     }
 
@@ -18,12 +22,16 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const adminSupabase = createAdminClient();
-    const { data: order } = await adminSupabase
+    const { data: order, error: orderLookupError } = await adminSupabase
       .from('orders')
-      .select('id, user_id, total, status, payment_status, razorpay_order_id')
+      .select('id, user_id, total, amount_due_now, status, payment_status, razorpay_order_id')
       .eq('id', orderId)
       .maybeSingle();
 
+    if (orderLookupError) {
+      console.error('Payment order lookup failed:', orderLookupError.code);
+      return NextResponse.json({ error: 'Unable to load your order for payment. Please try again shortly.' }, { status: 503 });
+    }
     if (!order || order.user_id !== user.id) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
@@ -34,7 +42,8 @@ export async function POST(request: NextRequest) {
     try {
       await validateDropshipOrderAvailability(orderId);
     } catch (availabilityError) {
-      return NextResponse.json({ error: availabilityError instanceof Error ? availabilityError.message : 'A supplier item is unavailable' }, { status: 409 });
+      console.error('Checkout availability check failed:', availabilityError);
+      return NextResponse.json({ error: 'We could not confirm the latest price and availability. Please refresh your cart and try again.' }, { status: 409 });
     }
 
     const key_id = process.env.RAZORPAY_KEY_ID;
@@ -44,39 +53,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Payment service is not configured' }, { status: 503 });
     }
 
-    const amountInPaise = Math.round(Number(order.total) * 100);
-    if (!Number.isSafeInteger(amountInPaise) || amountInPaise < 100) {
+    let amountInPaise: number;
+    try { amountInPaise = paymentAmountInPaise(order.amount_due_now ?? order.total); } catch {
       return NextResponse.json({ error: 'Invalid order total' }, { status: 400 });
     }
 
     if (order.razorpay_order_id) {
-      return NextResponse.json({ id: order.razorpay_order_id, amount: amountInPaise, currency: 'INR', key_id });
+      return NextResponse.json({ id: order.razorpay_order_id, order_id: order.razorpay_order_id, amount: amountInPaise, currency: 'INR', key_id });
     }
 
-    const response = await fetch('https://api.razorpay.com/v1/orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Basic ${Buffer.from(`${key_id}:${key_secret}`).toString('base64')}`,
-      },
-      body: JSON.stringify({
+    let data;
+    try {
+      data = await razorpayClient().orders.create({
         amount: amountInPaise,
         currency: 'INR',
         receipt: orderId,
-        payment_capture: 1,
         notes: {
           order_id: orderId, // Include order ID for webhook lookup
         },
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('Razorpay error:', error);
-      return NextResponse.json({ error: 'Failed to create Razorpay order' }, { status: 500 });
+      });
+    } catch (error: any) {
+      // Never log an SDK error object: it may contain Basic Auth headers.
+      console.error('Razorpay order creation failed:', error?.statusCode || 'network');
+      return NextResponse.json({ error: 'Unable to initialise payment. Please try again shortly.' }, { status: error?.statusCode === 401 ? 401 : 500 });
     }
-
-    const data = await response.json();
 
     const { data: boundOrder, error: bindError } = await adminSupabase
       .from('orders')
@@ -98,13 +98,14 @@ export async function POST(request: NextRequest) {
         .eq('id', orderId)
         .single();
       if (concurrentlyBoundOrder?.razorpay_order_id) {
-        return NextResponse.json({ id: concurrentlyBoundOrder.razorpay_order_id, amount: amountInPaise, currency: 'INR', key_id });
+        return NextResponse.json({ id: concurrentlyBoundOrder.razorpay_order_id, order_id: concurrentlyBoundOrder.razorpay_order_id, amount: amountInPaise, currency: 'INR', key_id });
       }
       return NextResponse.json({ error: 'Failed to initialise payment' }, { status: 500 });
     }
 
     return NextResponse.json({
       id: data.id,
+      order_id: data.id,
       amount: data.amount,
       currency: data.currency,
       key_id,

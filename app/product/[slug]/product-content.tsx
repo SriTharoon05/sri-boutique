@@ -1,6 +1,8 @@
 'use client';
+import { storefrontSlug } from '@/lib/storefront-brand';
 
 import { useState, useEffect } from 'react';
+import { useVendorQuota } from '@/components/providers/vendor-quota-provider';
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -23,6 +25,8 @@ interface ProductPageContentProps {
 }
 
 export function ProductPageContent({ product, reviews, relatedProducts }: ProductPageContentProps) {
+  const quota = useVendorQuota();
+  const vendorBlocked = product.source_type === 'dropship' && quota.blocked;
   const { addItem, loading: cartLoading } = useCart();
   const { user } = useAuth();
   const router = useRouter();
@@ -61,6 +65,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
   }, [product.id]);
 
   const handleAddToCart = async () => {
+    if (vendorBlocked) { toast.error(quota.message); return false; }
     if (isDemo) {
       toast.info('This is a demo product. Add your live inventory in the admin area to enable checkout.');
       return false;
@@ -70,7 +75,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
       return false;
     }
 
-    if (selectedVariant.stock_quantity < quantity) {
+    if (!selectedVariant.is_active || selectedVariant.stock_quantity < quantity) {
       toast.error('Not enough stock available');
       return false;
     }
@@ -132,7 +137,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
           <span>/</span>
           {product.category && (
             <>
-              <Link href={`/category/${product.category.slug}`} className="hover:text-primary">
+              <Link href={`/category/${storefrontSlug(product.category.slug)}`} className="hover:text-primary">
                 {product.category.name}
               </Link>
               <span>/</span>
@@ -235,7 +240,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
             <div>
               {product.category && (
                 <Link
-                  href={`/category/${product.category.slug}`}
+                  href={`/category/${storefrontSlug(product.category.slug)}`}
                   className="text-sm text-muted-foreground hover:text-primary uppercase tracking-wider"
                 >
                   {product.category.name}
@@ -334,6 +339,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
                     className="p-2 hover:bg-muted"
+                    aria-label="Decrease quantity"
                     disabled={quantity <= 1}
                   >
                     <Minus className="h-4 w-4" />
@@ -342,18 +348,20 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
                   <button
                     onClick={() => setQuantity(Math.min((selectedVariant?.stock_quantity || 99), quantity + 1))}
                     className="p-2 hover:bg-muted"
+                    aria-label="Increase quantity"
                     disabled={quantity >= (selectedVariant?.stock_quantity || 99)}
                   >
                     <Plus className="h-4 w-4" />
                   </button>
                 </div>
                 <span className="text-sm text-muted-foreground">
-                  {selectedVariant?.stock_quantity || 0} available
+                  {vendorBlocked ? 'Unavailable today' : product.source_type === 'dropship' ? 'Availability checked at checkout' : `${selectedVariant?.stock_quantity || 0} available`}
                 </span>
               </div>
             </div>
 
             {/* Stock Status */}
+            {vendorBlocked && <p role="status" className="text-sm text-destructive">{quota.message}</p>}
             {selectedVariant && selectedVariant.stock_quantity === 0 && (
               <Badge variant="destructive">Out of Stock</Badge>
             )}
@@ -364,7 +372,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
                 size="lg"
                 className="flex-1"
                 onClick={handleAddToCart}
-                disabled={addingToCart || !selectedVariant || selectedVariant.stock_quantity === 0 || isDemo}
+                disabled={vendorBlocked || addingToCart || !selectedVariant || selectedVariant.stock_quantity === 0 || isDemo}
               >
                 {isDemo ? 'Demo Product' : addingToCart ? 'Adding...' : 'Add to Cart'}
               </Button>
@@ -373,7 +381,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
                 variant="outline"
                 className="flex-1"
                 onClick={handleBuyNow}
-                disabled={!selectedVariant || selectedVariant.stock_quantity === 0 || isDemo}
+                disabled={vendorBlocked || !selectedVariant || selectedVariant.stock_quantity === 0 || isDemo}
               >
                 Buy Now
               </Button>
@@ -393,7 +401,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
             <div className="grid grid-cols-3 gap-4">
               <div className="flex flex-col items-center text-center p-3">
                 <Truck className="h-5 w-5 text-primary mb-2" />
-                <span className="text-xs">Free Shipping</span>
+                <span className="text-xs">Shipping at checkout</span>
               </div>
               <div className="flex flex-col items-center text-center p-3">
                 <RefreshCw className="h-5 w-5 text-primary mb-2" />
@@ -425,7 +433,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
             </h2>
             {user && (
               <Button asChild>
-                <Link href={`/product/${product.slug}/review`}>Write a Review</Link>
+                <Link href={`/product/${storefrontSlug(product.slug)}/review`}>Write a Review</Link>
               </Button>
             )}
           </div>
@@ -489,7 +497,7 @@ export function ProductPageContent({ product, reviews, relatedProducts }: Produc
                 const image = getDisplayProductImage(related.slug, variant?.image_urls?.[0], index);
 
                 return (
-                  <Link key={related.id} href={`/product/${related.slug}`}>
+                  <Link key={related.id} href={`/product/${storefrontSlug(related.slug)}`}>
                     <div className="group">
                       <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-muted">
                         <Image

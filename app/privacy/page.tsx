@@ -9,9 +9,10 @@ export default function PrivacyPolicyPage() {
     <MainLayout>
       <div className="container mx-auto px-4 py-12 md:py-20 max-w-2xl">
         <h1 className="font-display text-4xl font-semibold mb-2">Privacy Policy</h1>
-        <p className="text-sm text-muted-foreground mb-10">Last updated: July 2026</p>
+        <p className="text-sm text-muted-foreground mb-10">Last updated: September 2026</p>
 
         <div className="space-y-8 text-muted-foreground leading-relaxed">
+          <section><h2 className="font-display text-xl text-foreground mb-3">Order processing and delivery</h2><p>To process and deliver your order, we share the necessary recipient name, phone number, delivery address, selected variant and quantity with trusted fulfilment and delivery partners. An optional contact email may be shared where needed for order communications. We do not share your payment credentials with these partners.</p></section>
           <section>
             <h2 className="font-display text-xl font-medium text-foreground mb-3">
               1. Information We Collect

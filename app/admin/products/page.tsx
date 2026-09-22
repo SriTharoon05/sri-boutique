@@ -23,6 +23,7 @@ import {
 import { Loader2, Plus, Pencil, Power, Search, Truck } from 'lucide-react';
 import { Product, Category, ProductVariant } from '@/types/database';
 import { toast } from 'sonner';
+import { PAYMENT_TEST_PRODUCT_ID, PAYMENT_TEST_SLUG } from '@/lib/payment-test-product';
 
 export default function AdminProductsPage() {
   const { user, profile, loading: authLoading } = useAuth();
@@ -93,6 +94,10 @@ export default function AdminProductsPage() {
   };
 
   const handleEdit = (product: Product & { variants?: ProductVariant[] }) => {
+    if (product.id === PAYMENT_TEST_PRODUCT_ID) {
+      toast.info('The test item stays fixed at ₹1 and is admin-only. Use its enable/disable button.');
+      return;
+    }
     const variant = product.variants?.[0];
     setEditingProduct(product);
     setFormData({
@@ -175,6 +180,15 @@ export default function AdminProductsPage() {
   };
 
   const toggleActive = async (product: Product) => {
+    if (product.id === PAYMENT_TEST_PRODUCT_ID) {
+      try {
+        const response = await fetch('/api/admin/payment-test', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !product.is_active }) });
+        if (!response.ok) throw new Error('Unable to change test product visibility');
+        toast.success(product.is_active ? 'Admin test product disabled' : 'Admin test product enabled');
+        await fetchData();
+      } catch { toast.error('Unable to change test product visibility'); }
+      return;
+    }
     const supabase = createClient();
     const { error } = await supabase
       .from('products')
@@ -217,6 +231,15 @@ export default function AdminProductsPage() {
           </Button>
         </div>
 
+        {products.filter(p => p.id === PAYMENT_TEST_PRODUCT_ID).map(product => (
+          <Card key={product.id} className="p-5 mb-6 space-y-3">
+            <h2 className="font-semibold">₹1 payment test product — Admin only</h2>
+            <p className="text-sm text-muted-foreground">No delivery, no shipping charge, quantity one. Supplier checks are skipped only for this local item. Payment verification stays enabled. Live keys charge real money.</p>
+            <p className="text-sm">Hidden from customers and search engines, including direct links. Only signed-in administrators can view or buy it.</p>
+            <Button onClick={() => toggleActive(product)}>{product.is_active ? 'Enabled — disable test product' : 'Disabled — enable for admins'}</Button>
+            {product.is_active && <a className="ml-4 underline" href={`/product/${PAYMENT_TEST_SLUG}`} target="_blank" rel="noreferrer">Open ₹1 test product</a>}
+          </Card>
+        ))}
         <div className="relative mb-6">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input

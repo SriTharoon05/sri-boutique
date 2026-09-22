@@ -10,6 +10,9 @@ interface EmailRequest {
   subject: string;
   orderNumber: string;
   total: number;
+  paymentMethod?: string;
+  amountPaid?: number;
+  codBalance?: number;
   items: Array<{
     name: string;
     quantity: number;
@@ -40,7 +43,7 @@ function escapeHtml(value: unknown): string {
 }
 
 function buildOrderConfirmationEmail(
-  { orderNumber, total, items, shippingAddress }: Omit<EmailRequest, "to" | "subject">,
+  { orderNumber, total, items, shippingAddress, paymentMethod, amountPaid, codBalance }: Omit<EmailRequest, "to" | "subject">,
   siteUrl: string
 ): string {
   const itemRows = items
@@ -96,7 +99,7 @@ function buildOrderConfirmationEmail(
                 Thank you for your order
               </h1>
               <p style="margin:0 0 28px; font-size:15px; line-height:1.6; color:#5a4d47;">
-                We've received your order and payment has been confirmed. Here's your summary.
+                ${paymentMethod === 'cod' ? `Your COD advance of ${formatINR(Number(amountPaid || 0))} has been confirmed. Balance on delivery: ${formatINR(Number(codBalance || 0))}.` : "We've received your order and payment has been confirmed."} Sri Boutique will arrange fulfilment. Here's your summary.
               </p>
 
               <!-- Order Number Box -->
@@ -244,7 +247,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const htmlContent = buildOrderConfirmationEmail(
-      { orderNumber, total, items, shippingAddress },
+      { orderNumber, total, items, shippingAddress, paymentMethod: body.paymentMethod, amountPaid: body.amountPaid, codBalance: body.codBalance },
       siteUrl
     );
 

@@ -1,3 +1,5 @@
+import { storefrontSlug } from '@/lib/storefront-brand';
+import { PAYMENT_TEST_PRODUCT_ID } from '@/lib/payment-test-product';
 import { MetadataRoute } from 'next';
 import { createPublicClient } from '@/lib/supabase/public';
 import { SITE_URL } from '@/lib/site';
@@ -48,8 +50,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (!supabase) {
       return includeDemoCatalogue ? [
         ...staticPages,
-        ...demoCategories.map((category) => ({ url: `${baseUrl}/category/${category.slug}`, lastModified: new Date(category.created_at), changeFrequency: 'weekly' as const, priority: 0.8 })),
-        ...demoProducts.map((product) => ({ url: `${baseUrl}/product/${product.slug}`, lastModified: new Date(product.created_at), changeFrequency: 'weekly' as const, priority: 0.9 })),
+        ...demoCategories.map((category) => ({ url: `${baseUrl}/category/${storefrontSlug(category.slug)}`, lastModified: new Date(category.created_at), changeFrequency: 'weekly' as const, priority: 0.8 })),
+        ...demoProducts.map((product) => ({ url: `${baseUrl}/product/${storefrontSlug(product.slug)}`, lastModified: new Date(product.created_at), changeFrequency: 'weekly' as const, priority: 0.9 })),
       ] : staticPages;
     }
 
@@ -60,7 +62,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     const sitemapCategories = categories?.length ? categories : includeDemoCatalogue ? demoCategories : [];
     const categoryPages: MetadataRoute.Sitemap = sitemapCategories.map((category: { slug: string; created_at: string; synced_at?: string | null }) => ({
-      url: `${baseUrl}/category/${category.slug}`,
+      url: `${baseUrl}/category/${storefrontSlug(category.slug)}`,
       lastModified: new Date(category.synced_at || category.created_at),
       changeFrequency: 'weekly' as const,
       priority: 0.8,
@@ -70,11 +72,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const { data: products } = await supabase
       .from('products')
       .select('slug, created_at, synced_at')
-      .eq('is_active', true);
+      .eq('is_active', true).neq('id', PAYMENT_TEST_PRODUCT_ID);
 
     const sitemapProducts = products?.length ? products : includeDemoCatalogue ? demoProducts : [];
     const productPages: MetadataRoute.Sitemap = sitemapProducts.map((product: { slug: string; created_at: string; synced_at?: string | null }) => ({
-      url: `${baseUrl}/product/${product.slug}`,
+      url: `${baseUrl}/product/${storefrontSlug(product.slug)}`,
       lastModified: new Date(product.synced_at || product.created_at),
       changeFrequency: 'weekly' as const,
       priority: 0.9,

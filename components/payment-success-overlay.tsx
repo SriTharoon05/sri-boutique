@@ -6,9 +6,10 @@ interface PaymentSuccessOverlayProps {
   show: boolean;
   onClose: () => void;
   orderNumber?: string;
+  codBalance?: number;
 }
 
-export function PaymentSuccessOverlay({ show, onClose, orderNumber }: PaymentSuccessOverlayProps) {
+export function PaymentSuccessOverlay({ show, onClose, orderNumber, codBalance }: PaymentSuccessOverlayProps) {
   return (
     <AnimatePresence>
       {show && (
@@ -72,7 +73,7 @@ export function PaymentSuccessOverlay({ show, onClose, orderNumber }: PaymentSuc
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.55, duration: 0.35 }}
             >
-              Payment Successful
+              {codBalance ? 'COD advance received' : 'Payment Successful'}
             </motion.h2>
 
             <motion.p
@@ -81,7 +82,7 @@ export function PaymentSuccessOverlay({ show, onClose, orderNumber }: PaymentSuc
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.65, duration: 0.35 }}
             >
-              {orderNumber
+              {codBalance ? `₹${codBalance.toLocaleString('en-IN')} remains payable on delivery. ` : ''}{orderNumber
                 ? `Your order ${orderNumber} has been placed.`
                 : 'Your order has been placed.'}
             </motion.p>

@@ -1,6 +1,8 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin-client';
 import { getSheScaleClient } from './shescale';
+import { getVendorDailyQuota } from './daily-quota';
+import { PAYMENT_TEST_PRODUCT_ID, PAYMENT_TEST_VARIANT_ID } from '@/lib/payment-test-product';
 
 function record(value: unknown): Record<string, any> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
@@ -25,6 +27,12 @@ export async function dispatchDropshipOrder(orderId: string) {
   const results: Array<{ supplierId: string; status: string; error?: string }> = [];
   for (const supplierId of supplierIds) {
     const { data: supplier } = await db.from('suppliers').select('*').eq('id', supplierId).single();
+    // Manual reseller fulfilment: payment callbacks must never place or pay for
+    // a supplier order. The store owner places it separately in SheScale.
+    if (supplier?.code === 'shescale') {
+      results.push({ supplierId, status: 'manual_action_required' });
+      continue;
+    }
     if (!supplier?.enabled) {
       results.push({ supplierId, status: 'skipped', error: 'Supplier is disabled' });
       continue;
@@ -88,9 +96,22 @@ export async function dispatchDropshipOrder(orderId: string) {
 
 export async function validateDropshipOrderAvailability(orderId: string) {
   const db: any = createAdminClient();
-  const { data: order, error } = await db.from('orders').select('id, items:order_items(*)').eq('id', orderId).single();
+  const { data: order, error } = await db.from('orders').select('id, user_id, items:order_items(*)').eq('id', orderId).single();
   if (error || !order) throw new Error('Order not found');
   const dropshipItems = (order.items || []).filter((item: any) => item.supplier_id);
+  if ((order.items || []).some((item: any) => item.variant_id === PAYMENT_TEST_VARIANT_ID)) {
+    const { data: owner } = await db.from('profiles').select('role').eq('id', order.user_id).single();
+    if (owner?.role !== 'admin') throw new Error('Payment test is restricted to administrators');
+    const { data: testProduct } = await db.from('products').select('is_active').eq('id', PAYMENT_TEST_PRODUCT_ID).single();
+    if (!testProduct?.is_active) throw new Error('Payment test product is private');
+  }
+  if (dropshipItems.length) {
+    const quota = await getVendorDailyQuota();
+    const { data: reservation, error: quotaError } = await db.from('vendor_daily_reservations').select('quota_day').eq('order_id', orderId).maybeSingle();
+    if (!quota.ready || quotaError || !reservation || reservation.quota_day !== quota.day) {
+      throw new Error('This checkout has expired. Please start a new checkout.');
+    }
+  }
   const productCache = new Map<string, Awaited<ReturnType<ReturnType<typeof getSheScaleClient>['getNormalizedProduct']>>>();
   for (const item of dropshipItems) {
     const { data: supplier } = await db.from('suppliers').select('*').eq('id', item.supplier_id).single();
@@ -99,7 +120,10 @@ export async function validateDropshipOrderAvailability(orderId: string) {
     const cacheKey = `${supplier.id}:${item.supplier_product_id}`;
     let product = productCache.get(cacheKey);
     if (!product) {
-      product = await getSheScaleClient(supplier.base_url).getNormalizedProduct(item.supplier_product_id);
+      const { data: local } = await db.from('products').select('supplier_payload').eq('supplier_id', supplier.id).eq('supplier_product_id', item.supplier_product_id).single();
+      const slug = local?.supplier_payload?.slug;
+      if (!slug) throw new Error('Supplier product needs a catalogue refresh');
+      product = await getSheScaleClient(supplier.base_url).getNormalizedProduct(slug);
       productCache.set(cacheKey, product);
     }
     const variant = product.variants.find((candidate) => candidate.externalId === item.supplier_variant_id);

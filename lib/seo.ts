@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { CatalogProduct } from '@/lib/demo-catalog';
 import { absoluteUrl, SITE_NAME } from '@/lib/site';
+import { PAYMENT_TEST_PRODUCT_ID } from '@/lib/payment-test-product';
 
 export function buildPageMetadata(title: string, description: string, path: string): Metadata {
   const url = absoluteUrl(path);
@@ -17,9 +18,11 @@ export function buildPageMetadata(title: string, description: string, path: stri
       title: socialTitle,
       description,
       url,
+      images: [{ url: absoluteUrl('/social-card'), width: 1200, height: 630, alt: 'Sri Boutique — style, your way.' }],
     },
     twitter: {
       card: 'summary_large_image',
+      images: [absoluteUrl('/social-card')],
       title: socialTitle,
       description,
     },
@@ -41,7 +44,7 @@ export function productSeoDescription(product: CatalogProduct) {
 }
 
 export function isDemoRecord(record: { id?: string; slug?: string }) {
-  return record.id?.startsWith('demo-') === true || record.slug?.endsWith('-preview') === true;
+  return record.id === PAYMENT_TEST_PRODUCT_ID || record.id?.startsWith('demo-') === true || record.slug?.endsWith('-preview') === true;
 }
 
 export const merchantReturnPolicy = {

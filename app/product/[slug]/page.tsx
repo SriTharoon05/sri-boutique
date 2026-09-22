@@ -1,6 +1,9 @@
+import { catalogSlugCandidates } from '@/lib/storefront-brand';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { createPublicClient } from '@/lib/supabase/public';
+import { createClient } from '@/lib/supabase/server';
+import { PAYMENT_TEST_SLUG } from '@/lib/payment-test-product';
 import { ProductPageContent } from './product-content';
 import { findDemoProduct } from '@/lib/demo-catalog';
 import { absoluteUrl } from '@/lib/site';
@@ -18,15 +21,26 @@ interface ProductPageProps {
   params: Promise<{ slug: string }>;
 }
 
+async function productClient(slug: string) {
+  if (slug !== PAYMENT_TEST_SLUG) return createPublicClient();
+  const db = await createClient();
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) notFound();
+  const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).single();
+  if (profile?.role !== 'admin') notFound();
+  return db;
+}
+
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const supabase = createPublicClient();
+  const supabase = await productClient(slug);
 
   const { data: product } = supabase
     ? await supabase
         .from('products')
         .select('*, category:categories (*), variants:product_variants (*)')
-        .eq('slug', slug)
+        .in('slug', catalogSlugCandidates(slug))
+        .eq('is_active', true)
         .maybeSingle()
     : { data: null };
   const resolvedProduct = product || findDemoProduct(slug);
@@ -59,7 +73,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
 function productOffer(product: CatalogProduct, variant: CatalogProduct['variants'][number]) {
   const price = variant.price_override ?? product.base_price;
-  const available = variant.is_active && (product.source_type === 'dropship' || variant.stock_quantity > 0);
+  const available = variant.is_active && variant.stock_quantity > 0;
   return {
       '@type': 'Offer',
       price,
@@ -72,7 +86,7 @@ function productOffer(product: CatalogProduct, variant: CatalogProduct['variants
         ...shippingDetails,
         shippingRate: {
           ...shippingDetails.shippingRate,
-          value: price >= 2000 ? 0 : 99,
+          value: price > 2000 ? 0 : 99,
         },
       },
       hasMerchantReturnPolicy: { '@id': merchantReturnPolicy['@id'] },
@@ -137,13 +151,14 @@ function generateStructuredData(product: CatalogProduct) {
 
 export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params;
-  const supabase = createPublicClient();
+  const supabase = await productClient(slug);
 
   const { data: product } = supabase
     ? await supabase
         .from('products')
         .select('*, category:categories (*), variants:product_variants (*)')
-        .eq('slug', slug)
+        .in('slug', catalogSlugCandidates(slug))
+        .eq('is_active', true)
         .maybeSingle()
     : { data: null };
   const resolvedProduct = product || findDemoProduct(slug);
@@ -180,10 +195,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   return (
     <>
-      <script
+      {!isDemoRecord(resolvedProduct) && <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-      />
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, '\\u003c') }}
+      />}
       <ProductPageContent
         product={resolvedProduct}
         reviews={reviews || []}

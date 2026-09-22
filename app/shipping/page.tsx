@@ -12,6 +12,7 @@ export default function ShippingPage() {
         <h1 className="font-display text-4xl font-semibold mb-8">Shipping Information</h1>
 
         <div className="space-y-8 text-muted-foreground leading-relaxed">
+          <section><h2 className="font-display text-xl text-foreground mb-3">Delivery of your order</h2><p>Your delivery charge is displayed at checkout before payment. Delivery dates are estimates and depend on your address and product availability. If your address cannot be served, we will contact you and refund the unfulfilled order. We will not add undisclosed delivery charges to a confirmed order.</p></section>
           <section>
             <h2 className="font-display text-xl font-medium text-foreground mb-3">
               Delivery Timelines
@@ -30,7 +31,7 @@ export default function ShippingPage() {
             </h2>
             <p>
               We offer <strong>free shipping</strong> on all orders above
-              ₹2,000. For orders below this amount, a flat shipping charge of
+              ₹2,000. For orders at or below this amount, a flat shipping charge of
               ₹99 applies at checkout.
             </p>
           </section>

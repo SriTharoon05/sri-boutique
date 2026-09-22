@@ -91,7 +91,7 @@ export default function OrdersPage() {
                         {order.order_number}
                       </span>
                       <Badge className={statusColors[order.status]}>
-                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                        {order.payment_method === 'cod' && order.status === 'paid' ? 'COD advance paid' : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">

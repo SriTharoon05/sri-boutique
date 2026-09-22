@@ -1,7 +1,9 @@
 'use client';
+import { isPaymentTestCart } from '@/lib/payment-test-product';
 
 export const dynamic = 'force-dynamic';
 import Image from 'next/image';
+import { INDIA_STATES } from '@/lib/checkout-address';
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -16,8 +18,10 @@ import { Separator } from '@/components/ui/separator';
 import { Loader2, CreditCard, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { getDisplayProductImage } from '@/lib/mock-images';
+import { loadRazorpayCheckout, type CheckoutResult } from '@/lib/razorpay-checkout';
 
 interface FormData {
+  email: string;
   fullName: string;
   addressLine1: string;
   addressLine2: string;
@@ -28,16 +32,9 @@ interface FormData {
   phone: string;
 }
 
-declare global {
-  interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => {
-      open: () => void;
-      on: (event: string, callback: () => void) => void;
-    };
-  }
-}
 
 const initialFormData: FormData = {
+  email: '',
   fullName: '',
   addressLine1: '',
   addressLine2: '',
@@ -57,9 +54,18 @@ export default function CheckoutPage() {
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [formErrors, setFormErrors] = useState<Partial<FormData>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [pendingVerification, setPendingVerification] = useState<CheckoutResult | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [discount, setDiscount] = useState(0);
   const [couponId, setCouponId] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('online');
+  const [paymentOptions, setPaymentOptions] = useState({ codAvailable: false, codAdvance: 100, codFee: 100 });
+  useEffect(() => {
+    if (!user) return;
+    const controller = new AbortController();
+    fetch('/api/checkout/payment-options', { signal: controller.signal, cache: 'no-store' }).then(async r => { if (!r.ok) throw new Error(); return r.json(); }).then(data => { setPaymentOptions(data); if (!data.codAvailable) setPaymentMethod('online'); }).catch(() => setPaymentMethod('online'));
+    return () => controller.abort();
+  }, [user, items]);
 
   // Tracks whether checkout has already succeeded, so the "cart is
   // empty, redirect to /cart" effect below knows to stand down instead of
@@ -90,8 +96,9 @@ export default function CheckoutPage() {
     }
   }, [items, cartLoading, router, paymentCompleted]);
 
-  const shipping = subtotal > 2000 ? 0 : 99;
-  const total = subtotal - discount + shipping;
+  const shipping = isPaymentTestCart(items) || subtotal > 2000 ? 0 : 99;
+  const total = subtotal - discount + shipping + (paymentMethod === 'cod' ? paymentOptions.codFee : 0);
+  const payNow = paymentMethod === 'cod' ? Math.min(total, paymentOptions.codAdvance) : total;
 
   useEffect(() => {
     const code = searchParams.get('coupon');
@@ -115,27 +122,39 @@ export default function CheckoutPage() {
     const errors: Partial<FormData> = {};
 
     if (!formData.fullName.trim()) errors.fullName = 'Full name is required';
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'Enter a valid email address';
     if (!formData.addressLine1.trim()) errors.addressLine1 = 'Address is required';
     if (!formData.city.trim()) errors.city = 'City is required';
     if (!formData.state.trim()) errors.state = 'State is required';
     if (!formData.pincode.trim()) errors.pincode = 'Pincode is required';
-    else if (!/^\d{6}$/.test(formData.pincode)) errors.pincode = 'Invalid pincode';
+    else if (!/^[1-9]\d{5}$/.test(formData.pincode)) errors.pincode = 'Invalid pincode';
     if (!formData.phone.trim()) errors.phone = 'Phone number is required';
-    else if (!/^\d{10}$/.test(formData.phone)) errors.phone = 'Invalid phone number';
+    else if (!/^[6-9]\d{9}$/.test(formData.phone)) errors.phone = 'Enter a 10-digit Indian mobile number';
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const handleCreateOrder = async () => {
+    if (submitting) return;
+    if (pendingVerification && orderId) {
+      setSubmitting(true);
+      await verifyPayment(pendingVerification, orderId);
+      setSubmitting(false);
+      return;
+    }
     if (!validateForm()) {
       toast.error('Please fill all required fields correctly');
       return;
     }
 
     setSubmitting(true);
+    let modalOpened = false;
+    let resultReceived = false;
 
     try {
+      // Load before reserving a local order so script failures do not consume capacity.
+      await loadRazorpayCheckout();
       let currentOrderId = orderId;
       if (!currentOrderId) {
         const orderRes = await fetch('/api/orders', {
@@ -144,6 +163,7 @@ export default function CheckoutPage() {
           body: JSON.stringify({
             shippingAddress: {
               fullName: formData.fullName,
+              email: formData.email.trim(),
               addressLine1: formData.addressLine1,
               addressLine2: formData.addressLine2,
               city: formData.city,
@@ -153,6 +173,7 @@ export default function CheckoutPage() {
             },
             phone: formData.phone,
             couponId,
+            paymentMethod,
           }),
         });
 
@@ -183,34 +204,45 @@ export default function CheckoutPage() {
           amount: paymentData.amount,
           currency: 'INR',
           name: 'Sri Boutique',
-          description: 'Order Payment',
-          order_id: paymentData.id,
-          handler: async (response: any) => {
-            await verifyPayment(response, verifiedOrderId);
+          description: paymentMethod === 'cod' ? 'COD advance' : 'Order payment',
+          order_id: paymentData.order_id || paymentData.id,
+          handler: async (response: CheckoutResult) => {
+            resultReceived = true;
+            setPendingVerification(response);
+            try { await verifyPayment(response, verifiedOrderId); }
+            finally { setSubmitting(false); }
+          },
+          modal: {
+            ondismiss: () => {
+              if (!resultReceived) {
+                setSubmitting(false);
+                toast.info('Payment cancelled. You can retry when ready.');
+              }
+            },
           },
           prefill: {
             name: formData.fullName,
-            email: user?.email,
-            contact: formData.phone,
+            email: formData.email.trim() || user?.email,
+            contact: `+91${formData.phone}`,
           },
           theme: {
-            color: '#8B3A3A',
+            color: '#526e60',
           },
         };
 
-        // @ts-ignore - Razorpay is loaded via script
       if (!window.Razorpay) throw new Error('Payment service is still loading. Please try again.');
       const rzp = new window.Razorpay(options);
-      rzp.on('payment.failed', () => toast.error('Payment failed. Your order has not been charged.'));
+      rzp.on('payment.failed', () => toast.error('Payment was not completed. Retry in the payment window or close it. If money was deducted, check your order status before paying again.'));
       rzp.open();
+      modalOpened = true;
     } catch (error: any) {
       toast.error(error.message || 'Failed to create order');
     } finally {
-      setSubmitting(false);
+      if (!modalOpened) setSubmitting(false);
     }
   };
 
-  const verifyPayment = async (response: any, currentOrderId: string) => {
+  const verifyPayment = async (response: CheckoutResult, currentOrderId: string) => {
     try {
       const res = await fetch('/api/payments/verify', {
         method: 'POST',
@@ -230,8 +262,9 @@ export default function CheckoutPage() {
       }
 
       await handlePaymentSuccess(currentOrderId);
+      setPendingVerification(null);
     } catch (error: any) {
-      toast.error(error.message || 'Payment verification failed');
+      toast.error(`${error.message || 'Payment verification failed'}. Please retry verification or check My Orders before making another payment.`);
     }
   };
 
@@ -249,13 +282,6 @@ export default function CheckoutPage() {
     refreshCart();
     router.push(`/account/orders/${currentOrderId}?payment=success`);
   };
-
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    document.body.appendChild(script);
-  }, []);
 
   if (authLoading || cartLoading) {
     return (
@@ -282,7 +308,7 @@ export default function CheckoutPage() {
                 <h2 className="font-display text-xl font-medium">Shipping Address</h2>
               </div>
 
-              <div className="grid gap-4">
+              <fieldset disabled={Boolean(orderId)} className="grid gap-4">
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="fullName">Full Name *</Label>
@@ -298,9 +324,12 @@ export default function CheckoutPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone *</Label>
+                    <Label htmlFor="phone">Phone * (+91 India)</Label>
                     <Input
                       id="phone"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       className={formErrors.phone ? 'border-destructive' : ''}
@@ -311,8 +340,9 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
+                <div className="space-y-2"><Label htmlFor="customer-email">Email (optional)</Label><Input id="customer-email" type="email" autoComplete="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />{formErrors.email && <p className="text-sm text-destructive">{formErrors.email}</p>}</div>
                 <div className="space-y-2">
-                  <Label htmlFor="addressLine1">Address Line 1 *</Label>
+                  <Label htmlFor="addressLine1">House no., Street, Area *</Label>
                   <Input
                     id="addressLine1"
                     placeholder="Street address, P.O. box, company name"
@@ -326,7 +356,7 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="addressLine2">Address Line 2</Label>
+                  <Label htmlFor="addressLine2">Landmark / address details (optional)</Label>
                   <Input
                     id="addressLine2"
                     placeholder="Apartment, suite, unit, building, floor, etc."
@@ -351,12 +381,7 @@ export default function CheckoutPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="state">State *</Label>
-                    <Input
-                      id="state"
-                      value={formData.state}
-                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                      className={formErrors.state ? 'border-destructive' : ''}
-                    />
+                    <select id="state" value={formData.state} onChange={e => setFormData({ ...formData, state: e.target.value })} className="h-10 w-full border border-input bg-background px-3 text-sm"><option value="">Select state</option>{INDIA_STATES.map(state => <option key={state} value={state}>{state}</option>)}</select>
                     {formErrors.state && (
                       <p className="text-sm text-destructive">{formErrors.state}</p>
                     )}
@@ -366,6 +391,8 @@ export default function CheckoutPage() {
                     <Label htmlFor="pincode">Pincode *</Label>
                     <Input
                       id="pincode"
+                      inputMode="numeric"
+                      maxLength={6}
                       value={formData.pincode}
                       onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
                       className={formErrors.pincode ? 'border-destructive' : ''}
@@ -375,7 +402,7 @@ export default function CheckoutPage() {
                     )}
                   </div>
                 </div>
-              </div>
+              </fieldset>
             </Card>
 
             <Card className="p-6">
@@ -385,9 +412,11 @@ export default function CheckoutPage() {
               </div>
 
               <p className="text-muted-foreground">
-                You will be redirected to Razorpay to complete your payment securely.
+                Pay securely through Razorpay.
                 We accept all major credit cards, debit cards, UPI, and net banking.
               </p>
+              <fieldset className="mt-4 space-y-3" disabled={Boolean(orderId)}><legend className="font-medium mb-2">Payment method</legend><label className="flex gap-2"><input type="radio" name="payment-method" checked={paymentMethod === 'online'} onChange={() => setPaymentMethod('online')} />Pay online</label>{paymentOptions.codAvailable ? <label className="flex gap-2"><input type="radio" name="payment-method" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} />Cash on delivery — ₹{paymentOptions.codAdvance} advance online</label> : <p className="text-sm text-muted-foreground">COD is not currently available for this cart. Please pay online.</p>}</fieldset>
+              {paymentMethod === 'cod' && <p className="mt-3 text-sm">Pay ₹{payNow} now; ₹{Math.max(0, total-payNow)} is due to the courier. The additional COD charge is ₹{paymentOptions.codFee}. COD remains subject to delivery serviceability confirmation.</p>}
 
               <div className="mt-4 flex flex-wrap gap-2">
                 <div className="px-3 py-1 bg-muted rounded text-sm">Visa</div>
@@ -466,6 +495,7 @@ export default function CheckoutPage() {
                 <span>Total</span>
                 <span>₹{total.toLocaleString()}</span>
               </div>
+              {paymentMethod === 'cod' && <div className="mb-4 text-sm space-y-1"><p>COD charge included: ₹{paymentOptions.codFee}</p><p>Advance online: ₹{payNow}</p><p>Balance on delivery: ₹{Math.max(0, total-payNow)}</p></div>}
 
               <Button
                 size="lg"
@@ -479,7 +509,7 @@ export default function CheckoutPage() {
                     Processing...
                   </>
                 ) : (
-                  `Pay ₹${total.toLocaleString()}`
+                  pendingVerification ? 'Retry payment verification' : `Pay ₹${payNow.toLocaleString()}${paymentMethod === 'cod' ? ' advance' : ' online'}`
                 )}
               </Button>
 

@@ -1,3 +1,4 @@
+import { storefrontSlug } from '@/lib/storefront-brand';
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -54,7 +55,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
               const image = getDisplayProductImage(product.slug, variant?.image_urls?.[0], index);
               const price = variant?.price_override ?? product.base_price;
               return (
-                <Link key={product.id} href={`/product/${product.slug}`}>
+                <Link key={product.id} href={`/product/${storefrontSlug(product.slug)}`}>
                   <Card className="group border-0 shadow-none">
                     <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-muted">
                       <Image src={image} alt={product.name} fill sizes="(max-width: 768px) 50vw, 25vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />

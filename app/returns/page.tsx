@@ -13,6 +13,7 @@ export default function ReturnsPage() {
         </h1>
 
         <div className="space-y-8 text-muted-foreground leading-relaxed">
+          <section><h2 className="font-display text-xl text-foreground mb-3">Returns and COD advances</h2><p>Contact Sri Boutique for returns, cancellations and refunds. Please wait for our return instructions and the correct return address before sending an item back. If we cannot fulfil your order, amounts collected for the unfulfilled order, including any COD advance, will be refunded. We do not apply a blanket non-refundable-advance rule to defective, incorrect or undelivered goods. Any lawful deduction for a customer-requested cancellation or refused delivery must be disclosed and explained. Your statutory consumer rights remain unaffected.</p></section>
           <section>
             <h2 className="font-display text-xl font-medium text-foreground mb-3">
               Return Window

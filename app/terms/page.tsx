@@ -11,9 +11,10 @@ export default function TermsPage() {
         <h1 className="font-display text-4xl font-semibold mb-2">
           Terms & Conditions
         </h1>
-        <p className="text-sm text-muted-foreground mb-10">Last updated: July 2026</p>
+        <p className="text-sm text-muted-foreground mb-10">Last updated: September 2026</p>
 
         <div className="space-y-8 text-muted-foreground leading-relaxed">
+          <section><h2 className="font-display text-xl text-foreground mb-3">Orders and payments</h2><p>Shop with Sri Boutique for support throughout your order, from checkout to delivery. Online payments are processed securely through Razorpay. Contact us for order support, cancellations and refunds. If we cannot fulfil your order, we will contact you and refund amounts collected for the unfulfilled order.</p><p className="mt-3">Where cash on delivery is available, the displayed advance is paid online and the remaining balance is collected on delivery. Any COD charges are shown before payment. COD is not available on every product or address. We will not change a confirmed amount or substitute products without your agreement.</p><p className="mt-3">Orders are subject to availability and daily ordering capacity. If ordering is unavailable, please check back later. This does not restrict your rights relating to defective, incorrect or undelivered goods.</p></section>
           <section>
             <h2 className="font-display text-xl font-medium text-foreground mb-3">
               1. About Us

@@ -25,6 +25,9 @@ async function sendOrderEmail(
       subject: `Order Confirmed - ${order.order_number}`,
       orderNumber: order.order_number,
       total: order.total,
+      paymentMethod: order.payment_method,
+      amountPaid: order.amount_due_now ?? order.total,
+      codBalance: order.cod_balance,
       items: (order.items || []).map((item: any) => ({
         name: item.product_name,
         quantity: item.quantity,
@@ -71,9 +74,9 @@ Deno.serve(async (req: Request) => {
     const body = await req.text();
     const signature = req.headers.get("x-razorpay-signature");
 
-    const keySecret = Deno.env.get("RAZORPAY_KEY_SECRET");
+    const keySecret = Deno.env.get("RAZORPAY_WEBHOOK_SECRET");
     if (!keySecret) {
-      console.error("RAZORPAY_KEY_SECRET not configured");
+      console.error("RAZORPAY_WEBHOOK_SECRET not configured");
       return new Response(
         JSON.stringify({ error: "Webhook not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -124,7 +127,7 @@ Deno.serve(async (req: Request) => {
       // already did this first.
       const { data: existingOrder, error: fetchError } = await supabase
         .from("orders")
-        .select("id, status, user_id, total, razorpay_order_id")
+        .select("id, status, user_id, total, amount_due_now, razorpay_order_id")
         .eq("id", orderId)
         .maybeSingle();
 
@@ -138,7 +141,8 @@ Deno.serve(async (req: Request) => {
 
       if (!existingOrder.razorpay_order_id
         || payment.order_id !== existingOrder.razorpay_order_id
-        || Number(payment.amount) !== Math.round(Number(existingOrder.total) * 100)) {
+        || payment.currency !== 'INR'
+        || Number(payment.amount) !== Math.round(Number(existingOrder.amount_due_now ?? existingOrder.total) * 100)) {
         console.error("Payment/order binding check failed", orderId);
         return new Response(
           JSON.stringify({ error: "Payment does not match order" }),
@@ -146,7 +150,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      if (existingOrder.status !== "paid") {
+      if (existingOrder.status === "pending") {
         const { error: updateError } = await supabase
           .from("orders")
           .update({
@@ -155,7 +159,7 @@ Deno.serve(async (req: Request) => {
             payment_id: payment.id,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", orderId);
+          .eq("id", orderId).eq('status', 'pending');
 
         if (updateError) {
           console.error("Error updating order:", updateError);

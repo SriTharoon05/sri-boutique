@@ -1,3 +1,4 @@
+import { catalogSlugCandidates, categoryDescription } from '@/lib/storefront-brand';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { createPublicClient } from '@/lib/supabase/public';
@@ -20,7 +21,7 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   const supabase = createPublicClient();
 
   const { data: category } = supabase
-    ? await supabase.from('categories').select('*').eq('slug', slug).maybeSingle()
+    ? await supabase.from('categories').select('*').in('slug', catalogSlugCandidates(slug)).maybeSingle()
     : { data: null };
   const resolvedCategory = category || findDemoCategory(slug);
 
@@ -32,19 +33,19 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
 
   return {
     title: resolvedCategory.name,
-    description: resolvedCategory.description || `Shop our collection of ${resolvedCategory.name.toLowerCase()} at Sri Boutique.`,
+    description: categoryDescription(resolvedCategory),
     alternates: { canonical: absoluteUrl(`/category/${resolvedCategory.slug}`) },
     robots: isDemoRecord(resolvedCategory) ? { index: false, follow: true } : undefined,
     openGraph: {
       title: `${resolvedCategory.name} | Sri Boutique`,
-      description: resolvedCategory.description || `Shop our collection of ${resolvedCategory.name.toLowerCase()} at Sri Boutique.`,
+      description: categoryDescription(resolvedCategory),
       url: absoluteUrl(`/category/${resolvedCategory.slug}`),
       images: [{ url: getDisplayCategoryImage(resolvedCategory.slug, resolvedCategory.image_url) }],
     },
     twitter: {
       card: 'summary_large_image',
       title: `${resolvedCategory.name} | Sri Boutique`,
-      description: resolvedCategory.description || `Shop our collection of ${resolvedCategory.name.toLowerCase()} at Sri Boutique.`,
+      description: categoryDescription(resolvedCategory),
       images: [getDisplayCategoryImage(resolvedCategory.slug, resolvedCategory.image_url)],
     },
   };
@@ -55,7 +56,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const supabase = createPublicClient();
 
   const { data: category } = supabase
-    ? await supabase.from('categories').select('*').eq('slug', slug).maybeSingle()
+    ? await supabase.from('categories').select('*').in('slug', catalogSlugCandidates(slug)).maybeSingle()
     : { data: null };
   const resolvedCategory = category || findDemoCategory(slug);
 
@@ -91,6 +92,6 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
   return <>
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbData) }} />
-    <CategoryPageContent category={resolvedCategory} initialProducts={products} initialFilters={filters} />
+    <CategoryPageContent category={{ ...resolvedCategory, description: categoryDescription(resolvedCategory) }} initialProducts={products} initialFilters={filters} />
   </>;
 }

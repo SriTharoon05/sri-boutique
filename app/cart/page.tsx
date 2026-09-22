@@ -1,4 +1,6 @@
 'use client';
+import { isPaymentTestCart } from '@/lib/payment-test-product';
+import { storefrontSlug } from '@/lib/storefront-brand';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,7 +68,7 @@ export default function CartPage() {
     setCouponCode('');
   };
 
-  const shipping = subtotal > 2000 ? 0 : 99;
+  const shipping = isPaymentTestCart(items) || subtotal > 2000 ? 0 : 99;
   const total = subtotal - discount + shipping;
 
   if (loading) {
@@ -124,7 +126,7 @@ export default function CartPage() {
                       <Card className="p-4 md:p-6">
                         <div className="flex gap-4">
                           <Link
-                            href={`/product/${item.variant.product?.slug}`}
+                            href={`/product/${storefrontSlug(item.variant.product?.slug)}`}
                             className="w-24 h-32 md:w-32 md:h-40 flex-shrink-0 relative rounded-md overflow-hidden bg-muted"
                           >
                             <Image
@@ -140,7 +142,7 @@ export default function CartPage() {
                             <div className="flex justify-between">
                               <div>
                                 <Link
-                                  href={`/product/${item.variant.product?.slug}`}
+                                  href={`/product/${storefrontSlug(item.variant.product?.slug)}`}
                                   className="font-medium hover:text-primary transition-colors line-clamp-2"
                                 >
                                   {item.variant.product?.name}
@@ -166,6 +168,7 @@ export default function CartPage() {
                               <div className="flex items-center border rounded-md">
                                 <button
                                   className="p-2 hover:bg-muted"
+                                  aria-label="Decrease quantity"
                                   onClick={() => updateQuantity(item.id, item.quantity - 1)}
                                 >
                                   <Minus className="h-4 w-4" />
@@ -173,6 +176,7 @@ export default function CartPage() {
                                 <span className="w-10 text-center">{item.quantity}</span>
                                 <button
                                   className="p-2 hover:bg-muted"
+                                  aria-label="Increase quantity"
                                   onClick={() => updateQuantity(item.id, item.quantity + 1)}
                                 >
                                   <Plus className="h-4 w-4" />

@@ -27,6 +27,7 @@ export async function reconcileSupplierOrders() {
   let updated = 0;
   for (const row of rows || []) {
     const supplier = Array.isArray(row.supplier) ? row.supplier[0] : row.supplier;
+    if (supplier?.code === 'shescale') continue;
     const externalId = row.external_order_id || row.external_order_number;
     if (!supplier?.enabled || !externalId || supplier.adapter !== 'shescale_partner_v1') continue;
     try {
@@ -41,4 +42,3 @@ export async function reconcileSupplierOrders() {
   }
   return { checked: rows?.length || 0, updated };
 }
-

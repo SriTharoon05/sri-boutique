@@ -1,4 +1,5 @@
 import 'server-only';
+import { createAdminClient } from '@/lib/supabase/admin-client';
 import type { NormalizedSupplierProduct, SupplierProductPage } from './types';
 
 const DEFAULT_BASE_URL = 'https://api.shescale.in';
@@ -37,7 +38,8 @@ function normalizeProduct(input: unknown): NormalizedSupplierProduct | null {
   const category = asRecord(first(raw, ['category', 'productCategory'], {}));
   const categoryId = String(first(raw, ['categoryId', 'category_id'], first(category, ['id', '_id', 'slug'], 'uncategorised')));
   const categoryName = String(first(category, ['name', 'title'], first(raw, ['categoryName', 'category_name'], 'Uncategorised')));
-  const productCost = numberValue(first(raw, ['resellerPrice', 'reseller_price', 'wholesalePrice', 'wholesale_price', 'costPrice', 'cost_price', 'price']));
+  const productCost = numberValue(first(raw, ['supplyPrice', 'basePrice', 'resellerPrice', 'reseller_price', 'wholesalePrice', 'wholesale_price', 'costPrice', 'cost_price', 'price']));
+  if (productCost <= 0) throw new Error('Supplier returned a product without a valid positive cost');
   const productImages = imageList(raw);
   const rawVariants = first(raw, ['variants', 'productVariants', 'skus'], []);
   const variants = (Array.isArray(rawVariants) && rawVariants.length ? rawVariants : [raw]).map((value, index) => {
@@ -49,8 +51,12 @@ function normalizeProduct(input: unknown): NormalizedSupplierProduct | null {
       color: first(variant, ['color.name', 'color', 'colour'], null),
       size: first(variant, ['size.name', 'size'], 'Free Size'),
       cost: numberValue(first(variant, ['resellerPrice', 'reseller_price', 'wholesalePrice', 'wholesale_price', 'costPrice', 'cost_price', 'price'], productCost)),
-      stock: Math.max(0, Math.floor(numberValue(first(variant, ['stock', 'stockQuantity', 'stock_quantity', 'inventory'], 0)))),
-      images: imageList(variant).length ? imageList(variant) : productImages,
+      // Unlimited supplier stock is represented as our conservative per-order cap,
+      // not as zero stock or a claim about physical inventory.
+      stock: variant.isUnlimited === true || (variant.isUnlimited == null && raw.stockType === 'UNLIMITED')
+        ? Math.max(1, Math.min(99, numberValue(raw.maxOrderUnits, 99) || 99))
+        : Math.max(0, Math.floor(numberValue(first(variant, ['stock', 'stockQuantity', 'stock_quantity', 'inventory'], 0)))),
+      images: imageList(variant).length ? imageList(variant) : imageList({ images: raw.colorImages?.[variant.color] }).length ? imageList({ images: raw.colorImages?.[variant.color] }) : productImages,
       active: Boolean(first(variant, ['isActive', 'is_active', 'active'], true)),
     };
   });
@@ -62,9 +68,9 @@ function normalizeProduct(input: unknown): NormalizedSupplierProduct | null {
     categoryId,
     categoryName,
     cost: productCost || variants[0]?.cost || 0,
-    compareAtPrice: numberValue(first(raw, ['mrp', 'retailPrice', 'retail_price', 'compareAtPrice']), 0) || null,
+    compareAtPrice: numberValue(first(raw, ['suggestedMrp', 'mrp', 'retailPrice', 'retail_price', 'compareAtPrice']), 0) || null,
     images: productImages,
-    active: Boolean(first(raw, ['isActive', 'is_active', 'active', 'live'], true)),
+    active: (raw.status == null || raw.status === 'ACTIVE') && Boolean(first(raw, ['isActive', 'is_active', 'active', 'live'], true)),
     variants,
     raw,
   };
@@ -84,20 +90,22 @@ export class SheScaleClient {
   private readonly baseUrl: string;
   constructor(private readonly apiKey: string, baseUrl = DEFAULT_BASE_URL) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
-    if (!apiKey) throw new Error('SHESCALE_API_KEY is not configured');
+    if (this.baseUrl !== DEFAULT_BASE_URL) throw new Error('Unsupported SheScale API origin');
   }
 
-  private async request(path: string, init: RequestInit = {}) {
+  private async request(path: string, init: RequestInit = {}, publicRequest = false, token = this.apiKey) {
+    if (!publicRequest && !token) throw new Error('Supplier authentication is not configured');
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20_000);
     try {
       const response = await fetch(`${this.baseUrl}${path}`, {
         ...init,
         cache: 'no-store',
+        redirect: 'error',
         signal: controller.signal,
         headers: {
           Accept: 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
+          ...(!publicRequest ? { Authorization: `Bearer ${token}` } : {}),
           ...(init.body ? { 'Content-Type': 'application/json' } : {}),
           ...init.headers,
         },
@@ -106,9 +114,9 @@ export class SheScaleClient {
       let payload: unknown = {};
       try { payload = text ? JSON.parse(text) : {}; } catch { payload = { message: text.slice(0, 500) }; }
       if (!response.ok) {
-        const message = String(first(asRecord(payload), ['message', 'error.message', 'error'], `SheScale returned HTTP ${response.status}`));
-        throw new Error(message.slice(0, 500));
+        throw new Error(`SheScale returned HTTP ${response.status}`);
       }
+      if (asRecord(payload).success === false) throw new Error('SheScale reported an unsuccessful request');
       return payload;
     } finally {
       clearTimeout(timeout);
@@ -116,18 +124,22 @@ export class SheScaleClient {
   }
 
   async listProducts(page = 1, limit = 50, updatedSince?: string): Promise<SupplierProductPage> {
-    const query = new URLSearchParams({ page: String(page), limit: String(limit) });
-    if (updatedSince) query.set('updated_since', updatedSince);
-    const raw = await this.request(`/api/v1/partner/v1/products?${query}`);
+    const query = new URLSearchParams({ page: String(page), limit: String(limit), sortBy: 'newest' });
+    // The public API has no documented updated_since filter: always traverse it.
+    const raw = await this.request(`/api/v1/products?${query}`, {}, true);
+    if (!Array.isArray(asRecord(asRecord(raw).data).products)) throw new Error('Invalid supplier catalogue response');
     const products = extractItems(raw).map(normalizeProduct).filter((item): item is NormalizedSupplierProduct => Boolean(item));
     const root = asRecord(raw);
-    const totalPages = numberValue(first(root, ['meta.totalPages', 'data.meta.totalPages', 'pagination.totalPages'], page));
-    const hasMore = Boolean(first(root, ['meta.hasNextPage', 'data.meta.hasNextPage', 'pagination.hasMore'], products.length === limit && page < totalPages));
+    const totalPages = Math.ceil(numberValue(first(root, ['data.total']), 0) / Math.max(1, numberValue(first(root, ['data.limit']), limit)));
+    const hasMore = Boolean(first(root, ['meta.hasNextPage', 'data.meta.hasNextPage', 'pagination.hasMore'], page < totalPages));
     return { products, page, hasMore, raw };
   }
 
   async getProduct(id: string) {
-    return this.request(`/api/v1/partner/v1/products/${encodeURIComponent(id)}`);
+    const db: any = createAdminClient();
+    const { data, error } = await db.rpc('read_shescale_token');
+    if (error) throw new Error('Supplier token storage is unavailable');
+    return this.request(`/api/v1/products/${encodeURIComponent(id)}`, {}, false, data || process.env.SHESCALE_ACCESS_TOKEN || this.apiKey);
   }
 
   async getNormalizedProduct(id: string) {

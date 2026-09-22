@@ -1,17 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin-client';
-import crypto from 'crypto';
+import { z } from 'zod';
+import { verifyCheckoutSignature } from '@/lib/razorpay';
 import { dispatchDropshipOrder } from '@/lib/suppliers/orders';
+
+export const runtime = 'nodejs';
+const verificationSchema = z.object({
+  orderId: z.string().uuid(),
+  razorpay_order_id: z.string().regex(/^order_[a-zA-Z0-9]+$/).max(100),
+  razorpay_payment_id: z.string().regex(/^pay_[a-zA-Z0-9]+$/).max(100),
+  razorpay_signature: z.string().regex(/^[a-f0-9]{64}$/i),
+});
 
 export async function POST(request: NextRequest) {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId } = await request.json();
-
-    // 1. Basic input validation
-    if (!orderId) {
-      return NextResponse.json({ error: 'Missing orderId' }, { status: 400 });
-    }
+    const input = verificationSchema.safeParse(await request.json().catch(() => null));
+    if (!input.success) return NextResponse.json({ error: 'Missing or invalid payment verification data' }, { status: 400 });
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId } = input.data;
 
     // 2. Confirm the request is coming from a logged-in user (identity check only —
     //    authorization to mark the order paid comes from the signature check below,
@@ -26,38 +32,25 @@ export async function POST(request: NextRequest) {
     // 3. MANDATORY signature verification — no fallback path, no silent skip.
     const key_secret = process.env.RAZORPAY_KEY_SECRET;
 
-    if (!key_secret) {
+    if (!key_secret || !process.env.RAZORPAY_KEY_ID) {
       console.error('RAZORPAY_KEY_SECRET is not configured on the server');
       return NextResponse.json({ error: 'Payment verification not configured' }, { status: 500 });
     }
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      return NextResponse.json({ error: 'Missing payment verification data' }, { status: 400 });
-    }
-
-    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
-    const expectedSignature = crypto
-      .createHmac('sha256', key_secret)
-      .update(body)
-      .digest('hex');
-
-    const expectedBuffer = Buffer.from(expectedSignature, 'hex');
-    const receivedBuffer = Buffer.from(String(razorpay_signature), 'hex');
-    if (receivedBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, receivedBuffer)) {
-      console.error('Signature mismatch for order:', orderId);
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
-    }
-
-    // 4. Only reachable once the signature is genuinely verified.
+    // Bind verification to our stored order, never a client-supplied amount.
     const adminSupabase = createAdminClient();
 
     const { data: existingOrder, error: fetchError } = await adminSupabase
       .from('orders')
-      .select('id, user_id, status, email_sent, razorpay_order_id')
+      .select('id, user_id, status, email_sent, razorpay_order_id, total, amount_due_now')
       .eq('id', orderId)
       .single();
 
-    if (fetchError || !existingOrder) {
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('Payment verification order lookup failed:', fetchError.code);
+      return NextResponse.json({ error: 'Unable to load your payment status. Please retry verification shortly.' }, { status: 503 });
+    }
+    if (!existingOrder) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
@@ -69,10 +62,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Payment does not match this order' }, { status: 400 });
     }
 
+    if (!verifyCheckoutSignature(existingOrder.razorpay_order_id, razorpay_payment_id, razorpay_signature, key_secret)) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+    }
+    if (['cancelled', 'refunded'].includes(existingOrder.status)) {
+      return NextResponse.json({ error: 'This order is closed. Contact support if a payment was deducted.' }, { status: 409 });
+    }
+
     // 5. Mark the order paid if it isn't already. This may have already
     //    happened via the razorpay-webhook (which often fires before this
     //    client-side callback runs) — that's fine, this is idempotent.
-    if (existingOrder.status !== 'paid') {
+    const paymentResponse = await fetch(`https://api.razorpay.com/v1/payments/${encodeURIComponent(razorpay_payment_id)}`, {
+      headers: { Authorization: `Basic ${Buffer.from(`${process.env.RAZORPAY_KEY_ID}:${key_secret}`).toString('base64')}` },
+      cache: 'no-store', signal: AbortSignal.timeout(15000),
+    });
+    if (!paymentResponse.ok) return NextResponse.json({ error: 'Unable to verify captured payment' }, { status: 503 });
+    const captured = await paymentResponse.json();
+    if (captured.status !== 'captured' || captured.order_id !== razorpay_order_id || captured.currency !== 'INR' || captured.amount !== Math.round(Number(existingOrder.amount_due_now ?? existingOrder.total) * 100)) {
+      return NextResponse.json({ error: 'Payment is not captured for the expected amount' }, { status: 409 });
+    }
+    if (existingOrder.status === 'pending') {
       const { error: updateError } = await adminSupabase
         .from('orders')
         .update({
@@ -81,7 +90,7 @@ export async function POST(request: NextRequest) {
           payment_id: razorpay_payment_id,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', orderId);
+        .eq('id', orderId).eq('status', 'pending');
 
       if (updateError) {
         console.error('Error updating order:', updateError);
@@ -94,7 +103,8 @@ export async function POST(request: NextRequest) {
       .select('id')
       .eq('user_id', user.id)
       .maybeSingle();
-    if (userCart) await adminSupabase.from('cart_items').delete().eq('cart_id', userCart.id);
+    // Repeated verification must not delete a new shopping cart.
+    if (userCart && existingOrder.status === 'pending') await adminSupabase.from('cart_items').delete().eq('cart_id', userCart.id);
 
     // 6. Claim the right to send the confirmation email.
     //    This is an ATOMIC conditional update: it only succeeds (and only
@@ -158,6 +168,9 @@ export async function POST(request: NextRequest) {
             subject: `Order Confirmed - ${order.order_number}`,
             orderNumber: order.order_number,
             total: order.total,
+            paymentMethod: order.payment_method,
+            amountPaid: order.amount_due_now ?? order.total,
+            codBalance: order.cod_balance,
             items: order.items.map((item: any) => ({
               name: item.product_name,
               quantity: item.quantity,

@@ -10,6 +10,7 @@
 
 # next.js
 /.next/
+/.next-production-check/
 /.next-build/
 /.next-legacy-cache/
 /out/

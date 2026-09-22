@@ -1,4 +1,5 @@
 'use client';
+import { storefrontSlug, catalogSlugCandidates } from '@/lib/storefront-brand';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +38,7 @@ export default function WriteReviewPage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push(`/auth/login?redirectTo=/product/${params.slug}/review`);
+      router.push(`/auth/login?redirectTo=/product/${storefrontSlug(params.slug)}/review`);
       return;
     }
 
@@ -50,7 +51,7 @@ export default function WriteReviewPage() {
       const { data: product } = await supabase
         .from('products')
         .select('id, name')
-        .eq('slug', params.slug)
+        .in('slug', catalogSlugCandidates(params.slug))
         .maybeSingle();
 
       if (!product) {
@@ -133,7 +134,7 @@ export default function WriteReviewPage() {
 
       toast.success('Review submitted — thank you!');
       router.refresh();
-      router.push(`/product/${params.slug}`);
+      router.push(`/product/${storefrontSlug(params.slug)}`);
     } catch (error: any) {
       toast.error(error.message || 'Failed to submit review');
     } finally {
@@ -164,7 +165,7 @@ export default function WriteReviewPage() {
             back once your order status updates.
           </p>
           <Button asChild>
-            <a href={`/product/${params.slug}`}>Back to Product</a>
+            <a href={`/product/${storefrontSlug(params.slug)}`}>Back to Product</a>
           </Button>
         </div>
       </MainLayout>

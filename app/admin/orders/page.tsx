@@ -191,7 +191,7 @@ export default function AdminOrdersPage() {
                     </td>
                     <td className="py-4 px-6">
                       <Badge className={statusColors[order.status]}>
-                        {order.status}
+                        {order.payment_method === 'cod' && order.status === 'paid' ? 'COD advance paid' : order.status}
                       </Badge>
                     </td>
                     <td className="py-4 px-6">
@@ -242,7 +242,7 @@ export default function AdminOrdersPage() {
                               <div>
                                 <p className="text-sm text-muted-foreground">Payment Status</p>
                                 <Badge className={statusColors[order.payment_status]}>
-                                  {order.payment_status}
+                                  {order.payment_method === 'cod' ? `COD advance: ${order.payment_status}` : order.payment_status}
                                 </Badge>
                               </div>
                             </div>
@@ -275,7 +275,17 @@ export default function AdminOrdersPage() {
                               <p className="text-sm">
                                 {(order.shipping_address as any)?.city}, {(order.shipping_address as any)?.state} - {(order.shipping_address as any)?.pincode}
                               </p>
-                              <p className="text-sm">Phone: {order.phone}</p>
+                              <p className="text-sm">Phone: +91 {order.phone}</p>
+                              {(order.shipping_address as any)?.email && <p className="text-sm">Email: {(order.shipping_address as any).email}</p>}
+                              <p className="text-sm mt-3 font-medium">Manual supplier fulfilment: verify payment, then place the exact variant and quantity at this delivery address.</p>
+                              {order.payment_method === 'cod' && <div className="mt-3 text-sm"><p>Advance to collect online: ₹{order.amount_due_now}</p><p>Courier balance to collect: ₹{order.cod_balance}</p><p>COD charge: ₹{order.cod_fee}</p><p>In SheScale, verify that its final COD balance exactly matches ₹{order.cod_balance} before paying the supplier advance. Do not treat the online advance as full payment.</p></div>}
+                              <form className="mt-4 flex flex-wrap gap-2" onSubmit={async event => {
+                                event.preventDefault();
+                                const reference = new FormData(event.currentTarget).get('reference');
+                                const response = await fetch(`/api/admin/orders/${order.id}/fulfilment`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reference }) });
+                                const result = await response.json();
+                                if (!response.ok) toast.error(result.error); else { toast.success('Supplier order reference saved'); void fetchOrders(); }
+                              }}><Input name="reference" aria-label="Manual supplier order reference" defaultValue={order.supplier_reference || ''} placeholder="SheScale order reference after placing it" maxLength={160} required /><Button type="submit" variant="outline">Save supplier reference</Button></form>
                             </div>
 
                             <div className="flex justify-between text-lg font-semibold">

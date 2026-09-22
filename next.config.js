@@ -1,7 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  distDir: process.env.PRODUCTION_CHECK === '1' ? '.next-production-check' : '.next',
   poweredByHeader: false,
   compress: true,
+  async redirects() {
+    return ['product', 'category'].flatMap((section) => [{
+      source: `/${section}/:name(.*)-shescale-:suffix([^/]+)`,
+      destination: `/${section}/:name-sb-:suffix`,
+      permanent: true,
+    }, {
+      source: `/${section}/:name-shescale`,
+      destination: `/${section}/:name-sb`,
+      permanent: true,
+    }]);
+  },
   images: {
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 86400,

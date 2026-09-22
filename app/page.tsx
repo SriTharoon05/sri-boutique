@@ -23,7 +23,7 @@ export default async function HomePage() {
 
   if (supabase) {
     const [{ data: categoryData }, { data: productData }] = await Promise.all([
-      supabase.from('categories').select('*').is('parent_id', null).limit(4),
+      supabase.from('categories').select('*').is('parent_id', null).order('synced_at', { ascending: false, nullsFirst: false }).limit(4),
       supabase
         .from('products')
         .select('*, category:categories (*), variants:product_variants (*)')

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { syncSupplierCatalog } from '@/lib/suppliers/sync';
+export const maxDuration = 300;
 
 export async function POST(request: NextRequest, context: { params: Promise<{ code: string }> }) {
   const auth = await requireAdmin();
@@ -14,4 +15,3 @@ export async function POST(request: NextRequest, context: { params: Promise<{ co
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Catalogue sync failed' }, { status: 502 });
   }
 }
-

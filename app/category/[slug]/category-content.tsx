@@ -1,6 +1,8 @@
 'use client';
+import { storefrontSlug } from '@/lib/storefront-brand';
 
 import { useState } from 'react';
+import { useVendorQuota } from '@/components/providers/vendor-quota-provider';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
@@ -57,6 +59,7 @@ const priceRanges = [
 ];
 
 export function CategoryPageContent({ category, initialProducts, initialFilters }: CategoryPageContentProps) {
+  const quota = useVendorQuota();
   const products = initialProducts;
   const loading = false;
   const [selectedColors, setSelectedColors] = useState<string[]>(initialFilters.color?.split(',').filter(Boolean) || []);
@@ -358,7 +361,7 @@ export function CategoryPageContent({ category, initialProducts, initialFilters 
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
                       >
-                        <Link href={`/product/${product.slug}`}>
+                        <Link href={`/product/${storefrontSlug(product.slug)}`}>
                           <Card className="group overflow-hidden border-0 shadow-none bg-transparent">
                             <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-muted">
                               <Image
@@ -376,7 +379,7 @@ export function CategoryPageContent({ category, initialProducts, initialFilters 
                                 </div>
                               )}
 
-                              {variant?.stock_quantity === 0 && (
+                              {(variant?.stock_quantity === 0 || (product.source_type === 'dropship' && quota.blocked)) && (
                                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                                   <span className="text-white font-medium">Out of Stock</span>
                                 </div>
