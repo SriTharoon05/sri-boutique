@@ -55,7 +55,7 @@ export function Header() {
 
       <div className="container mx-auto flex h-20 items-center justify-between px-4">
         <Link href="/" aria-label="Sri Boutique home" className="group inline-flex items-center gap-2.5 leading-none">
-          <BrandLogo className="w-[90px]" priority />
+          <BrandLogo className="w-36 sm:w-48" priority />
         </Link>
 
         <div className="flex items-center gap-1 sm:gap-2">
